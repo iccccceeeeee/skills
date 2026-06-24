@@ -1,0 +1,4 @@
+interface:
+  display_name: "iCodeEasy Images"
+  short_description: "Generate and edit images via iCodeEasy API"
+  default_prompt: "Use $icodeeasy-image-generations to generate or edit an image from this prompt."
