@@ -1,49 +1,104 @@
 # Ice Skills
 
-Small Codex skills for repeatable local workflows.
+Codex skills for local workflows.
 
-## Included skills
+## 中文
 
-- `icodeeasy-image-generations`: generate and edit images with the iCodeEasy OpenAI-compatible Images API.
+### 包含的 skill
 
-## Install
+- `icodeeasy-image-generations`，通过 iCodeEasy 的 OpenAI 兼容 Images API 生成和编辑图片。
 
-Clone the repository:
-
-```bash
-git clone git@github.com:iccccceeeeee/skills.git ice-skills
-cd ice-skills
-```
-
-Install the skill by symlinking it into the Codex skills directory:
+### 安装
 
 ```bash
-mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
-ln -s "$PWD/icodeeasy-image-generations" \
-  "${CODEX_HOME:-$HOME/.codex}/skills/icodeeasy-image-generations"
+git clone git@github.com:iccccceeeeee/skills.git
+cd skills
+mkdir -p ~/.codex/skills
+ln -s "$PWD/icodeeasy-image-generations" ~/.codex/skills/
 ```
 
-If you prefer copying instead of symlinking:
+如果不想用软链接，可以复制：
 
 ```bash
-mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
-cp -R "$PWD/icodeeasy-image-generations" \
-  "${CODEX_HOME:-$HOME/.codex}/skills/icodeeasy-image-generations"
+mkdir -p ~/.codex/skills
+cp -R icodeeasy-image-generations ~/.codex/skills/
 ```
 
-Restart Codex after installing or updating a skill so the skill metadata can be discovered.
+安装或更新后，重启 Codex，让它重新发现 skill。
 
-## Configure image API access
-
-Set an API key in your shell environment:
+### 配置 API Key
 
 ```bash
 export OPENAI_API_KEY="<your-api-key>"
 ```
 
-Do not commit `.env` files or generated image outputs. This repository ignores `.env*` and `out/` directories by default.
+不要提交 `.env` 文件、生成图片或输出目录。本仓库默认忽略 `.env*` 和 `out/`。
 
-## Use the image skill script directly
+### 直接运行脚本
+
+生成图片：
+
+```bash
+python3 icodeeasy-image-generations/scripts/generate_image.py generate \
+  --prompt "a quiet watercolor landscape" \
+  --quality low \
+  --download-dir ./out/images
+```
+
+编辑图片：
+
+```bash
+python3 icodeeasy-image-generations/scripts/generate_image.py edit \
+  --prompt "make the lighting softer" \
+  --image-file /path/to/reference.png \
+  --quality low \
+  --download-dir ./out/images
+```
+
+只看请求，不发送：
+
+```bash
+python3 icodeeasy-image-generations/scripts/generate_image.py generate \
+  --prompt "minimal product photo" \
+  --dry-run \
+  --json
+```
+
+这个 skill 不发送 `size` 参数。API 返回的结果 URL 长期有效，持有链接的人可以访问图片，请按敏感信息处理。
+
+## English
+
+### Included skill
+
+- `icodeeasy-image-generations`: generate and edit images with the iCodeEasy OpenAI-compatible Images API.
+
+### Install
+
+```bash
+git clone git@github.com:iccccceeeeee/skills.git
+cd skills
+mkdir -p ~/.codex/skills
+ln -s "$PWD/icodeeasy-image-generations" ~/.codex/skills/
+```
+
+Copy instead of symlink:
+
+```bash
+mkdir -p ~/.codex/skills
+cp -R icodeeasy-image-generations ~/.codex/skills/
+```
+
+Restart Codex after installing or updating the skill.
+
+### Configure API access
+
+```bash
+export OPENAI_API_KEY="<your-api-key>"
+```
+
+Do not commit `.env` files, generated images, or output directories. This repository ignores `.env*` and `out/` by default.
+
+### Run the script directly
 
 Generate an image:
 
@@ -73,4 +128,4 @@ python3 icodeeasy-image-generations/scripts/generate_image.py generate \
   --json
 ```
 
-The skill intentionally does not send a `size` parameter. Result URLs returned by the API are long-lived bearer links, so treat them as sensitive.
+This skill does not send `size`. Result URLs are long-lived bearer links, so treat them as sensitive.
