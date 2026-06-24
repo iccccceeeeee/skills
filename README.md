@@ -26,23 +26,10 @@ mkdir -p ~/.codex/skills && rm -rf ~/.codex/skills/icodeeasy-image-generations &
 export OPENAI_API_KEY="<your-api-key>"
 ```
 
-直接运行脚本：
+使用：
 
-```bash
-python3 ~/.codex/skills/icodeeasy-image-generations/scripts/generate_image.py generate --prompt "a quiet watercolor landscape" --quality low --download-dir ./out/images
-```
-
-编辑图片：
-
-```bash
-python3 ~/.codex/skills/icodeeasy-image-generations/scripts/generate_image.py edit --prompt "make the lighting softer" --image-file /path/to/reference.png --quality low --download-dir ./out/images
-```
-
-只看请求，不发送：
-
-```bash
-python3 ~/.codex/skills/icodeeasy-image-generations/scripts/generate_image.py generate --prompt "minimal product photo" --dry-run --json
-```
+- 在 Codex 里直接说 `$icodeeasy-image-generations`，然后描述要生成或编辑的图片。
+- 如果要编辑图片，把参考图路径或 URL 一起给 Codex。
 
 不要提交 `.env` 文件、生成图片或输出目录。本仓库默认忽略 `.env*` 和 `out/`。
 

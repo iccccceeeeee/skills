@@ -26,23 +26,10 @@ Configure API access:
 export OPENAI_API_KEY="<your-api-key>"
 ```
 
-Run the script directly:
+Use:
 
-```bash
-python3 ~/.codex/skills/icodeeasy-image-generations/scripts/generate_image.py generate --prompt "a quiet watercolor landscape" --quality low --download-dir ./out/images
-```
-
-Edit an image:
-
-```bash
-python3 ~/.codex/skills/icodeeasy-image-generations/scripts/generate_image.py edit --prompt "make the lighting softer" --image-file /path/to/reference.png --quality low --download-dir ./out/images
-```
-
-Preview the request without sending it:
-
-```bash
-python3 ~/.codex/skills/icodeeasy-image-generations/scripts/generate_image.py generate --prompt "minimal product photo" --dry-run --json
-```
+- In Codex, invoke `$icodeeasy-image-generations`, then describe the image to generate or edit.
+- For image edits, provide the reference image path or URL in the same request.
 
 Do not commit `.env` files, generated images, or output directories. This repository ignores `.env*` and `out/` by default.
 
