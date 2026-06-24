@@ -2,48 +2,48 @@
 
 Codex skills for local workflows.
 
-English version: [README.en.md](README.en.md)
+中文版本: [README.md](README.md)
 
-每个 skill 都提供一条安装命令，直接拉到 `~/.codex/skills/`。
+Each skill provides one install command that pulls directly into `~/.codex/skills/`.
 
 ## Skills
 
 ### `icodeeasy-image-generations`
 
-通过 iCodeEasy 的 OpenAI 兼容 Images API 生成和编辑图片。
+Generate and edit images with the iCodeEasy OpenAI-compatible Images API.
 
-安装到 Codex：
+Install into Codex:
 
 ```bash
 mkdir -p ~/.codex/skills && npx degit --force iccccceeeeee/skills/icodeeasy-image-generations ~/.codex/skills/icodeeasy-image-generations
 ```
 
-安装或更新后，重启 Codex，让它重新发现 skill。
+Restart Codex after installing or updating the skill.
 
-配置 API Key：
+Configure API access:
 
 ```bash
 export OPENAI_API_KEY="<your-api-key>"
 ```
 
-直接运行脚本：
+Run the script directly:
 
 ```bash
 python3 ~/.codex/skills/icodeeasy-image-generations/scripts/generate_image.py generate --prompt "a quiet watercolor landscape" --quality low --download-dir ./out/images
 ```
 
-编辑图片：
+Edit an image:
 
 ```bash
 python3 ~/.codex/skills/icodeeasy-image-generations/scripts/generate_image.py edit --prompt "make the lighting softer" --image-file /path/to/reference.png --quality low --download-dir ./out/images
 ```
 
-只看请求，不发送：
+Preview the request without sending it:
 
 ```bash
 python3 ~/.codex/skills/icodeeasy-image-generations/scripts/generate_image.py generate --prompt "minimal product photo" --dry-run --json
 ```
 
-不要提交 `.env` 文件、生成图片或输出目录。本仓库默认忽略 `.env*` 和 `out/`。
+Do not commit `.env` files, generated images, or output directories. This repository ignores `.env*` and `out/` by default.
 
-这个 skill 不发送 `size` 参数。API 返回的结果 URL 长期有效，持有链接的人可以访问图片，请按敏感信息处理。
+This skill does not send `size`. Result URLs are long-lived bearer links, so treat them as sensitive.
