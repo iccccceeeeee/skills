@@ -4,7 +4,7 @@ Codex skills for local workflows.
 
 English version: [README.en.md](README.en.md)
 
-每个 skill 都提供一条安装命令，直接拉到 `~/.codex/skills/`。
+每个 skill 都提供一条安装命令，直接拉到 `~/.codex/skills/`。安装命令只依赖常见的 `curl` 和 `tar`。
 
 ## Skills
 
@@ -15,7 +15,7 @@ English version: [README.en.md](README.en.md)
 安装到 Codex：
 
 ```bash
-mkdir -p ~/.codex/skills && npx degit --force iccccceeeeee/skills/icodeeasy-image-generations ~/.codex/skills/icodeeasy-image-generations
+mkdir -p ~/.codex/skills && rm -rf ~/.codex/skills/icodeeasy-image-generations && curl -L https://github.com/iccccceeeeee/skills/archive/refs/heads/main.tar.gz | tar -xz -C ~/.codex/skills --strip-components=1 skills-main/icodeeasy-image-generations
 ```
 
 安装或更新后，重启 Codex，让它重新发现 skill。

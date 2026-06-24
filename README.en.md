@@ -4,7 +4,7 @@ Codex skills for local workflows.
 
 中文版本: [README.md](README.md)
 
-Each skill provides one install command that pulls directly into `~/.codex/skills/`.
+Each skill provides one install command that pulls directly into `~/.codex/skills/`. The install command only depends on common `curl` and `tar` tools.
 
 ## Skills
 
@@ -15,7 +15,7 @@ Generate and edit images with the iCodeEasy OpenAI-compatible Images API.
 Install into Codex:
 
 ```bash
-mkdir -p ~/.codex/skills && npx degit --force iccccceeeeee/skills/icodeeasy-image-generations ~/.codex/skills/icodeeasy-image-generations
+mkdir -p ~/.codex/skills && rm -rf ~/.codex/skills/icodeeasy-image-generations && curl -L https://github.com/iccccceeeeee/skills/archive/refs/heads/main.tar.gz | tar -xz -C ~/.codex/skills --strip-components=1 skills-main/icodeeasy-image-generations
 ```
 
 Restart Codex after installing or updating the skill.
