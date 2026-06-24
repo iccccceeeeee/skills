@@ -15,7 +15,7 @@ English version: [README.en.md](README.en.md)
 安装到 Codex：
 
 ```bash
-mkdir -p ~/.codex/skills && rm -rf ~/.codex/skills/icodeeasy-image-generations && curl -L https://github.com/iccccceeeeee/skills/archive/refs/heads/main.tar.gz | tar -xz -C ~/.codex/skills --strip-components=1 skills-main/icodeeasy-image-generations
+if [ -d ~/.codex/skills/icodeeasy-image-generations ]; then echo "icodeeasy-image-generations 已安装"; else mkdir -p ~/.codex/skills && curl -L https://github.com/iccccceeeeee/skills/archive/refs/heads/main.tar.gz | tar -xz -C ~/.codex/skills --strip-components=1 skills-main/icodeeasy-image-generations; fi
 ```
 
 安装或更新后，重启 Codex，让它重新发现 skill。
