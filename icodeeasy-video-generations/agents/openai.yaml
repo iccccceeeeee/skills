@@ -1,0 +1,4 @@
+interface:
+  display_name: "iCodeEasy Videos"
+  short_description: "Generate videos via the iCodeEasy API"
+  default_prompt: "Use $icodeeasy-video-generations to generate a video from this request."
