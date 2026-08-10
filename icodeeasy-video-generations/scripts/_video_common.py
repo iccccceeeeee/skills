@@ -51,6 +51,24 @@ class ProtocolError(Exception):
         self.uncertain = uncertain
 
 
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Surface API redirects as errors instead of issuing another request."""
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> None:
+        return None
+
+
+_NO_REDIRECT_OPENER = urllib.request.build_opener(_NoRedirectHandler())
+
+
 def resolve_api_key(*, required: bool = True) -> tuple[str, str]:
     """Return the first configured API key and the environment variable used."""
 
@@ -219,7 +237,10 @@ def _sanitize_response(value: Any, api_key: str | None) -> Any:
         return [_sanitize_response(item, api_key) for item in value]
     if isinstance(value, dict):
         return {
-            key: _sanitize_response(item, api_key) for key, item in value.items()
+            (
+                _sanitize_text(key, api_key) if isinstance(key, str) else key
+            ): _sanitize_response(item, api_key)
+            for key, item in value.items()
         }
     return value
 
@@ -272,7 +293,7 @@ def request_json(
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with _NO_REDIRECT_OPENER.open(request, timeout=timeout) as response:
             status = response.status
             body = response.read()
     except urllib.error.HTTPError as exc:

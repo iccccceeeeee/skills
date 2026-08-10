@@ -79,6 +79,13 @@ class AuthenticationTests(unittest.TestCase):
         self.assertIn("<redacted>", message)
         self.assertIn("https://media.example/video.mp4?<redacted>", message)
 
+        response_text = repr(caught.exception.response)
+        self.assertNotIn(api_key, response_text)
+        self.assertNotIn("signed-secret", response_text)
+        error = caught.exception.response["error"]
+        self.assertIn("credential-<redacted>", error)
+        self.assertIn("https://media.example/video.mp4?<redacted>", error)
+
 
 if __name__ == "__main__":
     unittest.main()

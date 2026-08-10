@@ -26,6 +26,7 @@ class FakeVideoAPI(AbstractContextManager["FakeVideoAPI"]):
         self.requests: list[dict[str, Any]] = []
         self.tasks: dict[str, tuple[bytes, str]] = {}
         self.created_task_count = 0
+        self.redirect_target: str | None = None
         self._server: _Server | None = None
         self._thread: threading.Thread | None = None
 
@@ -45,17 +46,24 @@ class FakeVideoAPI(AbstractContextManager["FakeVideoAPI"]):
             def log_message(self, format: str, *args: object) -> None:
                 return
 
+            def do_GET(self) -> None:
+                self._record(b"")
+                self._json(200, {"ok": True})
+
             def do_POST(self) -> None:
                 length = int(self.headers.get("Content-Length", "0"))
                 body = self.rfile.read(length)
-                owner.requests.append(
-                    {
-                        "method": "POST",
-                        "path": self.path,
-                        "headers": dict(self.headers.items()),
-                        "body": body,
-                    }
-                )
+                self._record(body)
+
+                if self.path == "/redirect":
+                    if owner.redirect_target is None:
+                        self._json(500, {"error": {"code": "missing_redirect_target"}})
+                        return
+                    self.send_response(302)
+                    self.send_header("Location", owner.redirect_target)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
 
                 if self.path == "/disconnect":
                     self.connection.shutdown(2)
@@ -75,13 +83,32 @@ class FakeVideoAPI(AbstractContextManager["FakeVideoAPI"]):
                 if self.path == "/secret-error":
                     secret = self.headers.get("Authorization", "").removeprefix("Bearer ")
                     signed = "https://media.example/video.mp4?token=signed-secret&expires=1"
-                    self._json(401, {"error": {"message": f"bad {secret} at {signed}"}})
+                    self._json(
+                        401,
+                        {
+                            "error": {
+                                "message": f"bad {secret} at {signed}",
+                                f"credential-{secret}": f"echo-{secret}",
+                                signed: signed,
+                            }
+                        },
+                    )
                     return
                 if self.path.startswith("/v1/videos/generations"):
                     self._generation(body)
                     return
 
                 self._json(202, {"ok": True})
+
+            def _record(self, body: bytes) -> None:
+                owner.requests.append(
+                    {
+                        "method": self.command,
+                        "path": self.path,
+                        "headers": dict(self.headers.items()),
+                        "body": body,
+                    }
+                )
 
             def _generation(self, body: bytes) -> None:
                 key = self.headers.get("Idempotency-Key", "")

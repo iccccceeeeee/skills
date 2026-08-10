@@ -73,6 +73,28 @@ class HttpTests(unittest.TestCase):
                     )
                 self.assertEqual(len(server.requests), 1)
 
+    def test_json_request_surfaces_redirect_without_contacting_target_origin(self) -> None:
+        with FakeVideoAPI() as target, FakeVideoAPI() as source:
+            source.redirect_target = target.base_url + "/capture"
+
+            with self.assertRaises(ProtocolError) as caught:
+                request_json(
+                    "POST",
+                    source.base_url + "/redirect",
+                    api_key="redirect-secret",
+                    payload={"prompt": "do not forward"},
+                    headers={"Idempotency-Key": "redirect-idempotency-key"},
+                    timeout=1,
+                )
+
+            target_authorizations = [
+                request["headers"].get("Authorization") for request in target.requests
+            ]
+            self.assertEqual(len(source.requests), 1)
+            self.assertEqual(target.requests, [])
+            self.assertNotIn("Bearer redirect-secret", target_authorizations)
+            self.assertEqual(caught.exception.status, 302)
+
     def test_structured_http_error_preserves_status_and_error_code(self) -> None:
         with FakeVideoAPI() as server:
             with self.assertRaises(ProtocolError) as caught:
