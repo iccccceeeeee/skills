@@ -17,8 +17,9 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 
 DEFAULT_BASE_URL = "https://api.icodeeasy.cc"
@@ -30,6 +31,18 @@ MAX_IDEMPOTENCY_KEY_LENGTH = 128
 MAX_DOWNLOAD_REDIRECTS = 1
 TASK_STATUSES_IN_PROGRESS = frozenset({"queued", "running"})
 TASK_STATUSES_TERMINAL = frozenset({"succeeded", "failed"})
+LOCAL_REFERENCE_HOSTS = frozenset(
+    {"localhost", "localhost.localdomain", "ip6-localhost", "ip6-loopback"}
+)
+LOCAL_REFERENCE_HOST_SUFFIXES = (
+    ".localhost",
+    ".local",
+    ".localdomain",
+    ".internal",
+    ".lan",
+    ".home",
+    ".corp",
+)
 
 
 class UserError(Exception):
@@ -53,6 +66,226 @@ class ProtocolError(Exception):
         self.error_code = error_code
         self.response = response
         self.uncertain = uncertain
+
+
+StandardValidation = Callable[[argparse.Namespace], None]
+
+
+@dataclass(frozen=True)
+class StandardModelSpec:
+    """Declarative public contract for a standard video-generation model."""
+
+    canonical_id: str
+    resolution_choices: tuple[str, ...]
+    default_resolution: str
+    ratio_choices: tuple[str, ...]
+    default_ratio: str
+    duration_choices: tuple[int, ...]
+    default_duration: int
+    supports_audio: bool
+    default_audio: bool | None
+    supports_first_frame: bool
+    supports_last_frame: bool
+    max_reference_images: int
+    validate: StandardValidation | None = None
+    reference_image_role: str | None = None
+
+
+def require_first_frame_for_last_frame(args: argparse.Namespace) -> None:
+    """Reject a last-frame-only request where the model requires a first frame."""
+
+    if getattr(args, "last_frame", None) and not getattr(args, "first_frame", None):
+        raise UserError("--last-frame requires --first-frame for this model.")
+
+
+class _StandardArgumentParser(argparse.ArgumentParser):
+    def __init__(self, *args: Any, spec: StandardModelSpec, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._standard_spec = spec
+
+    def parse_args(
+        self, args: list[str] | None = None, namespace: argparse.Namespace | None = None
+    ) -> argparse.Namespace:
+        parsed = super().parse_args(args, namespace)
+        if self._standard_spec.validate is not None:
+            try:
+                self._standard_spec.validate(parsed)
+            except UserError as exc:
+                self.error(str(exc))
+        return parsed
+
+
+def build_standard_parser(spec: StandardModelSpec) -> argparse.ArgumentParser:
+    """Build the shared create/run CLI while exposing only a model's capabilities."""
+
+    parser = _StandardArgumentParser(description=spec.canonical_id, spec=spec)
+    parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
+    parser.add_argument("--trust-custom-base-url", action="store_true")
+    parser.add_argument("--allow-insecure-localhost", action="store_true")
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--timeout", type=positive_float, default=60)
+    commands = parser.add_subparsers(
+        dest="command", required=True, parser_class=argparse.ArgumentParser
+    )
+
+    for command_name, help_text in (
+        ("create", "create one paid video task"),
+        ("run", "create, wait for, and optionally download one paid video task"),
+    ):
+        command = commands.add_parser(command_name, help=help_text)
+        command.add_argument("--prompt")
+        command.add_argument("--prompt-file")
+        command.add_argument(
+            "--resolution", choices=spec.resolution_choices, default=spec.default_resolution
+        )
+        command.add_argument("--ratio", choices=spec.ratio_choices, default=spec.default_ratio)
+        command.add_argument(
+            "--duration", type=positive_int, choices=spec.duration_choices,
+            default=spec.default_duration,
+        )
+        if spec.supports_audio:
+            command.add_argument(
+                "--generate-audio",
+                action=argparse.BooleanOptionalAction,
+                default=spec.default_audio,
+            )
+        if spec.supports_first_frame:
+            command.add_argument("--first-frame", type=validate_https_url)
+        if spec.supports_last_frame:
+            command.add_argument("--last-frame", type=validate_https_url)
+        if spec.max_reference_images:
+            command.add_argument(
+                "--reference-image",
+                action="append",
+                default=[],
+                type=validate_https_url,
+            )
+        command.add_argument("--confirm-paid", action="store_true")
+        command.add_argument("--dry-run", action="store_true")
+        command.add_argument("--idempotency-key")
+        if command_name == "run":
+            command.add_argument("--output")
+            command.add_argument("--overwrite", action="store_true")
+            command.add_argument("--interval", type=positive_float, default=5)
+            command.add_argument("--max-wait", type=positive_float, default=900)
+    return parser
+
+
+def build_standard_payload(spec: StandardModelSpec, args: argparse.Namespace) -> dict[str, Any]:
+    """Validate one standard-model request and return its public API payload."""
+
+    if spec.validate is not None:
+        spec.validate(args)
+    prompt = load_prompt(args.prompt, args.prompt_file)
+    content: list[dict[str, str]] = []
+    first_frame = getattr(args, "first_frame", None)
+    last_frame = getattr(args, "last_frame", None)
+    if first_frame:
+        content.append(
+            {"type": "image_url", "image_url": first_frame, "role": "first_frame"}
+        )
+    if last_frame:
+        content.append(
+            {"type": "image_url", "image_url": last_frame, "role": "last_frame"}
+        )
+    for image_url in getattr(args, "reference_image", []):
+        image = {"type": "image_url", "image_url": image_url}
+        if spec.reference_image_role is not None:
+            image["role"] = spec.reference_image_role
+        content.append(image)
+
+    if len(getattr(args, "reference_image", [])) > spec.max_reference_images:
+        raise UserError(
+            f"This model supports at most {spec.max_reference_images} reference images."
+        )
+
+    payload: dict[str, Any] = {
+        "model": spec.canonical_id,
+        "prompt": prompt,
+        "resolution": args.resolution,
+        "ratio": "adaptive" if first_frame or last_frame else args.ratio,
+        "duration": args.duration,
+    }
+    if content:
+        payload["content"] = content
+    if spec.supports_audio:
+        payload["generate_audio"] = args.generate_audio
+    return payload
+
+
+def run_standard_model(spec: StandardModelSpec, argv: list[str] | None = None) -> int:
+    """Run the declarative create/run flow without retrying the paid POST."""
+
+    args = build_standard_parser(spec).parse_args(argv)
+    try:
+        payload = build_standard_payload(spec, args)
+        if args.dry_run:
+            emit_result(payload, json_mode=args.json)
+            return 0
+        if not args.confirm_paid:
+            raise UserError("--confirm-paid is required before creating a paid video task.")
+
+        base_url = normalize_base_url(
+            args.base_url,
+            trust_custom=args.trust_custom_base_url,
+            allow_insecure_localhost=args.allow_insecure_localhost,
+        )
+        api_key, _source = resolve_api_key()
+        idempotency_key = (
+            validate_idempotency_key(args.idempotency_key)
+            if args.idempotency_key
+            else new_idempotency_key()
+        )
+        _status, response = request_json(
+            "POST",
+            f"{base_url}/v1/videos/generations",
+            api_key,
+            payload=payload,
+            headers={"Idempotency-Key": idempotency_key},
+            timeout=args.timeout,
+        )
+        task = _task_object(response)
+        task_id = task.get("id")
+        if not isinstance(task_id, str) or not task_id:
+            raise ProtocolError("Create response did not include a task id.", response=task)
+        result = dict(task)
+        result["idempotency_key"] = idempotency_key
+        result.setdefault("summary", f"Task created: {task_id}")
+
+        if args.command == "run":
+            task = poll_task(
+                base_url,
+                task_id,
+                api_key,
+                wait=True,
+                interval=args.interval,
+                max_wait=args.max_wait,
+                timeout=args.timeout,
+            )
+            result = dict(task)
+            result["idempotency_key"] = idempotency_key
+            status = task.get("status")
+            if status != "succeeded":
+                result.setdefault("summary", f"Task {task_id} ended with status {status}.")
+                emit_result(result, json_mode=args.json)
+                return 1
+            if args.output:
+                output = download_task(
+                    base_url,
+                    task_id,
+                    args.output,
+                    api_key,
+                    overwrite=args.overwrite,
+                    timeout=args.timeout,
+                )
+                result["output"] = str(output)
+            result.setdefault("summary", f"Task succeeded: {task_id}")
+
+        emit_result(result, json_mode=args.json)
+        return 0
+    except (UserError, ProtocolError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
 
 
 class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -140,6 +373,23 @@ def validate_https_url(value: str) -> str:
         or parsed.password is not None
     ):
         raise argparse.ArgumentTypeError("must be a public HTTPS URL")
+    hostname = parsed.hostname.lower()
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        pass
+    else:
+        if not address.is_global:
+            raise argparse.ArgumentTypeError("must use a globally routable HTTPS host")
+        return value
+    if (
+        hostname in LOCAL_REFERENCE_HOSTS
+        or hostname.endswith(LOCAL_REFERENCE_HOST_SUFFIXES)
+        or "." not in hostname
+    ):
+        raise argparse.ArgumentTypeError("must use a public HTTPS host")
+    if re.fullmatch(r"[0-9.]+", hostname):
+        raise argparse.ArgumentTypeError("must use a public HTTPS host")
     return value
 
 
