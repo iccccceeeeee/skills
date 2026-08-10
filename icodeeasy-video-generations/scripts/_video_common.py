@@ -91,6 +91,13 @@ class StandardModelSpec:
     reference_image_role: str | None = None
 
 
+@dataclass(frozen=True)
+class MotionModelSpec:
+    """Declarative public contract for a Kling Motion Control model."""
+
+    canonical_id: str
+
+
 def require_first_frame_for_last_frame(args: argparse.Namespace) -> None:
     """Reject a last-frame-only request where the model requires a first frame."""
 
@@ -213,12 +220,152 @@ def build_standard_payload(spec: StandardModelSpec, args: argparse.Namespace) ->
     return payload
 
 
+def build_motion_parser(spec: MotionModelSpec) -> argparse.ArgumentParser:
+    """Build a Motion Control CLI without exposing standard video options."""
+
+    parser = argparse.ArgumentParser(description=spec.canonical_id)
+    parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
+    parser.add_argument("--trust-custom-base-url", action="store_true")
+    parser.add_argument("--allow-insecure-localhost", action="store_true")
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--timeout", type=positive_float, default=60)
+    commands = parser.add_subparsers(
+        dest="command", required=True, parser_class=argparse.ArgumentParser
+    )
+
+    for command_name, help_text in (
+        ("create", "create one paid video task"),
+        ("run", "create, wait for, and optionally download one paid video task"),
+    ):
+        command = commands.add_parser(command_name, help=help_text)
+        command.add_argument("--prompt")
+        command.add_argument("--prompt-file")
+        command.add_argument("--mode", choices=("std", "pro"), default="std")
+        command.add_argument("--orientation", choices=("image", "video"), default="image")
+        command.add_argument(
+            "--keep-original-sound",
+            action=argparse.BooleanOptionalAction,
+            default=True,
+        )
+        command.add_argument("--reference-image", required=True, type=validate_https_url)
+        command.add_argument("--reference-video", required=True, type=validate_https_url)
+        command.add_argument("--confirm-paid", action="store_true")
+        command.add_argument("--dry-run", action="store_true")
+        command.add_argument("--idempotency-key")
+        if command_name == "run":
+            command.add_argument("--output")
+            command.add_argument("--overwrite", action="store_true")
+            command.add_argument("--interval", type=positive_float, default=5)
+            command.add_argument("--max-wait", type=positive_float, default=900)
+    return parser
+
+
+def build_motion_payload(spec: MotionModelSpec, args: argparse.Namespace) -> dict[str, Any]:
+    """Return a Motion Control payload from its two required public media URLs."""
+
+    prompt = load_optional_prompt(args.prompt, args.prompt_file)
+    return {
+        "model": spec.canonical_id,
+        "prompt": prompt,
+        "mode": args.mode,
+        "orientation": args.orientation,
+        "keep_original_sound": args.keep_original_sound,
+        "content": [
+            {
+                "type": "image_url",
+                "image_url": args.reference_image,
+                "role": "reference_image",
+            },
+            {
+                "type": "video_url",
+                "video_url": args.reference_video,
+                "role": "reference_video",
+            },
+        ],
+    }
+
+
 def run_standard_model(spec: StandardModelSpec, argv: list[str] | None = None) -> int:
     """Run the declarative create/run flow without retrying the paid POST."""
 
     args = build_standard_parser(spec).parse_args(argv)
     try:
         payload = build_standard_payload(spec, args)
+        if args.dry_run:
+            emit_result(payload, json_mode=args.json)
+            return 0
+        if not args.confirm_paid:
+            raise UserError("--confirm-paid is required before creating a paid video task.")
+
+        base_url = normalize_base_url(
+            args.base_url,
+            trust_custom=args.trust_custom_base_url,
+            allow_insecure_localhost=args.allow_insecure_localhost,
+        )
+        api_key, _source = resolve_api_key()
+        idempotency_key = (
+            validate_idempotency_key(args.idempotency_key)
+            if args.idempotency_key
+            else new_idempotency_key()
+        )
+        _status, response = request_json(
+            "POST",
+            f"{base_url}/v1/videos/generations",
+            api_key,
+            payload=payload,
+            headers={"Idempotency-Key": idempotency_key},
+            timeout=args.timeout,
+        )
+        task = _task_object(response)
+        task_id = task.get("id")
+        if not isinstance(task_id, str) or not task_id:
+            raise ProtocolError("Create response did not include a task id.", response=task)
+        result = dict(task)
+        result["idempotency_key"] = idempotency_key
+        result.setdefault("summary", f"Task created: {task_id}")
+
+        if args.command == "run":
+            task = poll_task(
+                base_url,
+                task_id,
+                api_key,
+                wait=True,
+                interval=args.interval,
+                max_wait=args.max_wait,
+                timeout=args.timeout,
+            )
+            result = dict(task)
+            result["idempotency_key"] = idempotency_key
+            status = task.get("status")
+            if status != "succeeded":
+                result.setdefault("summary", f"Task {task_id} ended with status {status}.")
+                emit_result(result, json_mode=args.json)
+                return 1
+            if args.output:
+                output = download_task(
+                    base_url,
+                    task_id,
+                    args.output,
+                    api_key,
+                    overwrite=args.overwrite,
+                    timeout=args.timeout,
+                )
+                result["output"] = str(output)
+            result.setdefault("summary", f"Task succeeded: {task_id}")
+
+        emit_result(result, json_mode=args.json)
+        return 0
+    except (UserError, ProtocolError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+
+def run_motion_model(spec: MotionModelSpec, argv: list[str] | None = None) -> int:
+    """Run the Motion Control create/run flow without retrying the paid POST."""
+
+    args = build_motion_parser(spec).parse_args(argv)
+    try:
+        payload = build_motion_payload(spec, args)
         if args.dry_run:
             emit_result(payload, json_mode=args.json)
             return 0
@@ -336,6 +483,21 @@ def load_prompt(prompt: str | None, prompt_file: str | os.PathLike[str] | None) 
     if not value:
         raise UserError("A non-empty --prompt or --prompt-file is required.")
     return value
+
+
+def load_optional_prompt(
+    prompt: str | None, prompt_file: str | os.PathLike[str] | None
+) -> str:
+    """Load an optional prompt while retaining mutual exclusion with prompt files."""
+
+    if prompt is not None and prompt_file is not None:
+        raise UserError("Use either --prompt or --prompt-file, not both.")
+    if prompt_file is not None:
+        try:
+            return Path(prompt_file).expanduser().read_text(encoding="utf-8").strip()
+        except OSError:
+            raise UserError("Could not read prompt file.") from None
+    return (prompt or "").strip()
 
 
 def positive_int(value: str) -> int:
