@@ -15,7 +15,7 @@ The skill provides one Python entry script per canonical model:
 - `doubao_seedance_1_5_pro.py`
 - `minimax_h3.py`
 - `kling_v2_6.py`
-- `kling_3_0_turbo.py`
+- `kling_v3_0_turbo.py`
 - `kling_v3.py`
 - `kling_v3_omni.py`
 - `kling_video_o1.py`

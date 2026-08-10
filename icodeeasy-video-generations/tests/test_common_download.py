@@ -9,6 +9,7 @@ import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest.mock import patch
 
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
@@ -20,6 +21,7 @@ from _video_common import (  # noqa: E402
     _validate_download_redirect,
     download_task,
 )
+import _video_common  # noqa: E402
 
 
 MP4 = b"\x00\x00\x00\x18ftypmp42test-video-bytes"
@@ -190,6 +192,26 @@ class DownloadTests(unittest.TestCase):
                 download_task(api.base_url, "vid_1", output, "secret", timeout=1)
             self.assertEqual(part.read_bytes(), b"untrusted-partial")
             self.assertEqual(api.requests, [])
+
+    def test_destination_appearing_during_download_is_not_overwritten(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp, _DownloadServer() as api:
+            output = Path(tmp) / "video.mp4"
+            original_link = _video_common.os.link
+
+            def create_destination_before_publish(
+                source: str | Path, destination: str | Path, *args: object, **kwargs: object
+            ) -> None:
+                output.write_bytes(b"appeared-during-download")
+                original_link(source, destination, *args, **kwargs)
+
+            with patch.object(
+                _video_common.os, "link", side_effect=create_destination_before_publish
+            ):
+                with self.assertRaisesRegex(UserError, "appeared during download"):
+                    download_task(api.base_url, "vid_1", output, "secret", timeout=1)
+
+            self.assertEqual(output.read_bytes(), b"appeared-during-download")
+            self.assertFalse(Path(str(output) + ".part").exists())
 
 
 if __name__ == "__main__":

@@ -221,6 +221,18 @@ class Seedance25Tests(unittest.TestCase):
         self.assertEqual(json.loads(result.stdout)["model"], "doubao-seedance-2.5")
         self.assertEqual(result.stdout.count("\n"), 1)
 
+    def test_prompt_file_error_is_path_private(self) -> None:
+        separator = "/"
+        private_user = "private" + "-user"
+        prompt_path = separator.join(("", "Users", private_user, "prompts", "prompt.txt"))
+
+        result = _run("create", "--prompt-file", prompt_path)
+
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stderr, "Could not read prompt file.\n")
+        self.assertNotIn(prompt_path, result.stderr)
+        self.assertNotIn(private_user, result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

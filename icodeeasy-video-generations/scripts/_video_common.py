@@ -289,6 +289,8 @@ def run_standard_model(spec: StandardModelSpec, argv: list[str] | None = None) -
     """Run the declarative create/run flow without retrying the paid POST."""
 
     args = build_standard_parser(spec).parse_args(argv)
+    idempotency_key: str | None = None
+    accepted_task_id: str | None = None
     try:
         payload = build_standard_payload(spec, args)
         if args.dry_run:
@@ -308,6 +310,8 @@ def run_standard_model(spec: StandardModelSpec, argv: list[str] | None = None) -
             if args.idempotency_key
             else new_idempotency_key()
         )
+        if not args.json:
+            print(f"Submitting task with idempotency key: {idempotency_key}", file=sys.stderr)
         _status, response = request_json(
             "POST",
             f"{base_url}/v1/videos/generations",
@@ -320,6 +324,7 @@ def run_standard_model(spec: StandardModelSpec, argv: list[str] | None = None) -
         task_id = task.get("id")
         if not isinstance(task_id, str) or not task_id:
             raise ProtocolError("Create response did not include a task id.", response=task)
+        accepted_task_id = task_id
         result = dict(task)
         result["idempotency_key"] = idempotency_key
         result.setdefault("summary", f"Task created: {task_id}")
@@ -356,7 +361,12 @@ def run_standard_model(spec: StandardModelSpec, argv: list[str] | None = None) -
         emit_result(result, json_mode=args.json)
         return 0
     except (UserError, ProtocolError) as exc:
-        print(str(exc), file=sys.stderr)
+        _emit_runner_error(
+            exc,
+            json_mode=args.json,
+            idempotency_key=idempotency_key,
+            accepted_task_id=accepted_task_id,
+        )
         return 1
 
 
@@ -364,6 +374,8 @@ def run_motion_model(spec: MotionModelSpec, argv: list[str] | None = None) -> in
     """Run the Motion Control create/run flow without retrying the paid POST."""
 
     args = build_motion_parser(spec).parse_args(argv)
+    idempotency_key: str | None = None
+    accepted_task_id: str | None = None
     try:
         payload = build_motion_payload(spec, args)
         if args.dry_run:
@@ -383,6 +395,8 @@ def run_motion_model(spec: MotionModelSpec, argv: list[str] | None = None) -> in
             if args.idempotency_key
             else new_idempotency_key()
         )
+        if not args.json:
+            print(f"Submitting task with idempotency key: {idempotency_key}", file=sys.stderr)
         _status, response = request_json(
             "POST",
             f"{base_url}/v1/videos/generations",
@@ -395,6 +409,7 @@ def run_motion_model(spec: MotionModelSpec, argv: list[str] | None = None) -> in
         task_id = task.get("id")
         if not isinstance(task_id, str) or not task_id:
             raise ProtocolError("Create response did not include a task id.", response=task)
+        accepted_task_id = task_id
         result = dict(task)
         result["idempotency_key"] = idempotency_key
         result.setdefault("summary", f"Task created: {task_id}")
@@ -431,8 +446,39 @@ def run_motion_model(spec: MotionModelSpec, argv: list[str] | None = None) -> in
         emit_result(result, json_mode=args.json)
         return 0
     except (UserError, ProtocolError) as exc:
-        print(str(exc), file=sys.stderr)
+        _emit_runner_error(
+            exc,
+            json_mode=args.json,
+            idempotency_key=idempotency_key,
+            accepted_task_id=accepted_task_id,
+        )
         return 1
+
+
+def _emit_runner_error(
+    error: UserError | ProtocolError,
+    *,
+    json_mode: bool,
+    idempotency_key: str | None,
+    accepted_task_id: str | None,
+) -> None:
+    """Report a failed create/run while preserving safe recovery identifiers."""
+
+    if json_mode:
+        result: dict[str, Any] = {"error": {"message": str(error)}}
+        if idempotency_key is not None:
+            result["idempotency_key"] = idempotency_key
+        if accepted_task_id is not None:
+            result["task_id"] = accepted_task_id
+        emit_result(result, json_mode=True)
+        return
+
+    context: list[str] = [str(error)]
+    if accepted_task_id is not None:
+        context.append(f"Accepted task_id: {accepted_task_id}.")
+    if idempotency_key is not None:
+        context.append(f"Idempotency key: {idempotency_key}.")
+    print(" ".join(context), file=sys.stderr)
 
 
 class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -475,8 +521,8 @@ def load_prompt(prompt: str | None, prompt_file: str | os.PathLike[str] | None) 
     if prompt_file is not None:
         try:
             value = Path(prompt_file).expanduser().read_text(encoding="utf-8")
-        except OSError as exc:
-            raise UserError(f"Could not read prompt file: {exc}") from None
+        except OSError:
+            raise UserError("Could not read prompt file.") from None
     else:
         value = prompt or ""
     value = value.strip()
@@ -982,11 +1028,17 @@ def download_task(
                 f"Truncated download: expected {expected_length} bytes, received {received}."
             )
         os.chmod(part, 0o600)
-        if destination.exists() and not overwrite:
+        if overwrite:
+            os.replace(part, destination)
+            created_part = False
+            return destination
+        try:
+            os.link(part, destination)
+        except FileExistsError:
             raise UserError(
                 f"Output appeared during download; use --overwrite: {destination}"
-            )
-        os.replace(part, destination)
+            ) from None
+        part.unlink()
         created_part = False
         return destination
     except (ProtocolError, UserError):

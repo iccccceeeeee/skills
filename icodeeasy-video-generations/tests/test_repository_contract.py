@@ -36,6 +36,11 @@ EXPECTED_INTERFACE = {
     "default_prompt": "Use $icodeeasy-video-generations to generate a video from this request.",
 }
 
+CREDENTIAL_ASSIGNMENT = re.compile(
+    r"(?:OPENAI_API_KEY|ANTHROPIC_AUTH_TOKEN|ICODEEASY_API_KEY)\s*=",
+    re.IGNORECASE,
+)
+
 
 def load_model_spec(script_name: str):
     script_path = SKILL_ROOT / "scripts" / script_name
@@ -72,10 +77,6 @@ class RepositoryContractTests(unittest.TestCase):
         local_home_prefix = "/" + "Users" + "/"
         local_username = "kurisu" + "code"
         personal_email_domain = "@" + "kurisu" + "amatist" + "." + "com"
-        credential_assignment = re.compile(
-            r"(?:OPENAI|ANTHROPIC|ICODEEASY)_" + r"API_KEY\s*=",
-            re.IGNORECASE,
-        )
         supplier_only_grok_id = "grok-imagine-1.5-video-" + "apimart"
         forbidden = (
             local_home_prefix,
@@ -104,10 +105,15 @@ class RepositoryContractTests(unittest.TestCase):
             except UnicodeDecodeError:
                 continue
 
-            if any(needle in text for needle in forbidden) or credential_assignment.search(text):
+            if any(needle in text for needle in forbidden) or CREDENTIAL_ASSIGNMENT.search(text):
                 violations.append(relative_path)
 
         self.assertEqual(violations, [])
+
+    def test_credential_assignment_pattern_covers_supported_environment_variables(self) -> None:
+        for assignment in ("OPENAI_API_KEY=value", "ANTHROPIC_AUTH_TOKEN=value"):
+            with self.subTest(assignment=assignment):
+                self.assertIsNotNone(CREDENTIAL_ASSIGNMENT.search(assignment))
 
     def test_public_metadata_and_repository_docs_are_complete(self) -> None:
         metadata = (SKILL_ROOT / "agents/openai.yaml").read_text(encoding="utf-8")
@@ -169,10 +175,6 @@ class RepositoryContractTests(unittest.TestCase):
         local_username = "kurisu" + "code"
         personal_email_domain = "@" + "kurisu" + "amatist" + ".com"
         supplier_only_grok_id = "grok-imagine-1.5-video-" + "apimart"
-        credential_assignment = re.compile(
-            r"(?:OPENAI|ANTHROPIC|ICODEEASY)_" + r"API_KEY\s*=",
-            re.IGNORECASE,
-        )
 
         self.assertFalse(
             any(
@@ -185,7 +187,7 @@ class RepositoryContractTests(unittest.TestCase):
                 )
             )
         )
-        self.assertIsNone(credential_assignment.search(snapshot))
+        self.assertIsNone(CREDENTIAL_ASSIGNMENT.search(snapshot))
 
     def test_runtime_does_not_import_test_catalog_snapshot(self) -> None:
         runtime_python = "\n".join(

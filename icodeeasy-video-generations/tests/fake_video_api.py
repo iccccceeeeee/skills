@@ -27,6 +27,9 @@ class FakeVideoAPI(AbstractContextManager["FakeVideoAPI"]):
         self.tasks: dict[str, tuple[bytes, str]] = {}
         self.created_task_count = 0
         self.redirect_target: str | None = None
+        self.disconnect_after_create = False
+        self.poll_error_status: int | None = None
+        self.download_error_status: int | None = None
         self._server: _Server | None = None
         self._thread: threading.Thread | None = None
 
@@ -48,6 +51,21 @@ class FakeVideoAPI(AbstractContextManager["FakeVideoAPI"]):
 
             def do_GET(self) -> None:
                 self._record(b"")
+                if self.path.startswith("/v1/videos/generations/"):
+                    if self.path.endswith("/content") and owner.download_error_status is not None:
+                        self._json(
+                            owner.download_error_status,
+                            {"error": {"code": "download_failed"}},
+                        )
+                        return
+                    if owner.poll_error_status is not None:
+                        self._json(
+                            owner.poll_error_status,
+                            {"error": {"code": "poll_failed"}},
+                        )
+                        return
+                    self._json(200, {"id": self.path.rsplit("/", 1)[-1], "status": "succeeded"})
+                    return
                 self._json(200, {"ok": True})
 
             def do_POST(self) -> None:
@@ -136,7 +154,7 @@ class FakeVideoAPI(AbstractContextManager["FakeVideoAPI"]):
                 digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:12]
                 task_id = f"vid_{digest}"
                 owner.tasks[key] = (normalized, task_id)
-                if "disconnect=1" in self.path:
+                if owner.disconnect_after_create or "disconnect=1" in self.path:
                     self.connection.shutdown(2)
                     self.connection.close()
                     return
