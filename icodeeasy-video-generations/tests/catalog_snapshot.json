@@ -1,0 +1,493 @@
+{
+    "source_catalog": "video-relay/internal/capability/catalog.json",
+    "source_commit": "7f82730d0b312d1988de0114b441ae971def386c",
+    "models": {
+        "doubao_seedance_2_5.py": {
+            "canonical_id": "doubao-seedance-2.5",
+            "resolution_choices": [
+                "480p",
+                "720p"
+            ],
+            "default_resolution": "480p",
+            "ratio_choices": [
+                "16:9",
+                "4:3",
+                "1:1",
+                "3:4",
+                "9:16",
+                "21:9",
+                "adaptive"
+            ],
+            "default_ratio": "9:16",
+            "duration_choices": [
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25,
+                26,
+                27,
+                28,
+                29,
+                30
+            ],
+            "default_duration": 4,
+            "supports_audio": true,
+            "default_audio": true,
+            "supports_first_frame": true,
+            "supports_last_frame": true,
+            "max_reference_images": 0,
+            "form": "standard"
+        },
+        "doubao_seedance_2_0.py": {
+            "canonical_id": "doubao-seedance-2.0",
+            "resolution_choices": [
+                "480p",
+                "720p",
+                "1080p",
+                "4K"
+            ],
+            "default_resolution": "480p",
+            "ratio_choices": [
+                "16:9",
+                "4:3",
+                "1:1",
+                "3:4",
+                "9:16",
+                "21:9",
+                "adaptive"
+            ],
+            "default_ratio": "9:16",
+            "duration_choices": [
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15
+            ],
+            "default_duration": 4,
+            "supports_audio": true,
+            "default_audio": true,
+            "supports_first_frame": true,
+            "supports_last_frame": true,
+            "max_reference_images": 0,
+            "form": "standard"
+        },
+        "doubao_seedance_2_0_fast.py": {
+            "canonical_id": "doubao-seedance-2.0-fast",
+            "resolution_choices": [
+                "480p",
+                "720p"
+            ],
+            "default_resolution": "480p",
+            "ratio_choices": [
+                "16:9",
+                "4:3",
+                "1:1",
+                "3:4",
+                "9:16",
+                "21:9",
+                "adaptive"
+            ],
+            "default_ratio": "9:16",
+            "duration_choices": [
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15
+            ],
+            "default_duration": 4,
+            "supports_audio": true,
+            "default_audio": true,
+            "supports_first_frame": true,
+            "supports_last_frame": true,
+            "max_reference_images": 1,
+            "form": "standard"
+        },
+        "doubao_seedance_2_0_mini.py": {
+            "canonical_id": "doubao-seedance-2.0-mini",
+            "resolution_choices": [
+                "480p",
+                "720p"
+            ],
+            "default_resolution": "480p",
+            "ratio_choices": [
+                "16:9",
+                "4:3",
+                "1:1",
+                "3:4",
+                "9:16",
+                "21:9",
+                "adaptive"
+            ],
+            "default_ratio": "9:16",
+            "duration_choices": [
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15
+            ],
+            "default_duration": 4,
+            "supports_audio": false,
+            "default_audio": null,
+            "supports_first_frame": true,
+            "supports_last_frame": true,
+            "max_reference_images": 0,
+            "form": "standard"
+        },
+        "doubao_seedance_1_5_pro.py": {
+            "canonical_id": "doubao-seedance-1.5-pro",
+            "resolution_choices": [
+                "480p",
+                "720p",
+                "1080p"
+            ],
+            "default_resolution": "480p",
+            "ratio_choices": [
+                "16:9",
+                "4:3",
+                "1:1",
+                "3:4",
+                "9:16",
+                "21:9"
+            ],
+            "default_ratio": "9:16",
+            "duration_choices": [
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12
+            ],
+            "default_duration": 4,
+            "supports_audio": true,
+            "default_audio": true,
+            "supports_first_frame": false,
+            "supports_last_frame": false,
+            "max_reference_images": 0,
+            "form": "standard"
+        },
+        "minimax_h3.py": {
+            "canonical_id": "MiniMax-H3",
+            "resolution_choices": [
+                "768P",
+                "2K"
+            ],
+            "default_resolution": "768P",
+            "ratio_choices": [
+                "21:9",
+                "16:9",
+                "4:3",
+                "1:1",
+                "3:4",
+                "9:16"
+            ],
+            "default_ratio": "9:16",
+            "duration_choices": [
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15
+            ],
+            "default_duration": 5,
+            "supports_audio": false,
+            "default_audio": null,
+            "supports_first_frame": true,
+            "supports_last_frame": true,
+            "max_reference_images": 0,
+            "form": "standard"
+        },
+        "grok_imagine_1_5_video.py": {
+            "canonical_id": "grok-imagine-1.5-video",
+            "resolution_choices": [
+                "480p",
+                "720p"
+            ],
+            "default_resolution": "480p",
+            "ratio_choices": [
+                "16:9",
+                "9:16",
+                "1:1",
+                "3:2",
+                "2:3"
+            ],
+            "default_ratio": "9:16",
+            "duration_choices": [
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25,
+                26,
+                27,
+                28,
+                29,
+                30
+            ],
+            "default_duration": 6,
+            "supports_audio": false,
+            "default_audio": null,
+            "supports_first_frame": false,
+            "supports_last_frame": false,
+            "max_reference_images": 7,
+            "form": "standard"
+        },
+        "kling_v2_6.py": {
+            "canonical_id": "kling-v2-6",
+            "resolution_choices": [
+                "720p",
+                "1080p"
+            ],
+            "default_resolution": "720p",
+            "ratio_choices": [
+                "16:9",
+                "9:16",
+                "1:1"
+            ],
+            "default_ratio": "9:16",
+            "duration_choices": [
+                5,
+                10
+            ],
+            "default_duration": 5,
+            "supports_audio": true,
+            "default_audio": false,
+            "supports_first_frame": true,
+            "supports_last_frame": true,
+            "max_reference_images": 0,
+            "form": "standard"
+        },
+        "kling_v3_0_turbo.py": {
+            "canonical_id": "kling-3.0-turbo",
+            "resolution_choices": [
+                "720p",
+                "1080p"
+            ],
+            "default_resolution": "720p",
+            "ratio_choices": [
+                "16:9",
+                "9:16",
+                "1:1"
+            ],
+            "default_ratio": "9:16",
+            "duration_choices": [
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15
+            ],
+            "default_duration": 5,
+            "supports_audio": false,
+            "default_audio": null,
+            "supports_first_frame": true,
+            "supports_last_frame": false,
+            "max_reference_images": 0,
+            "form": "standard"
+        },
+        "kling_v3.py": {
+            "canonical_id": "kling-v3",
+            "resolution_choices": [
+                "720p",
+                "1080p",
+                "4K"
+            ],
+            "default_resolution": "720p",
+            "ratio_choices": [
+                "16:9",
+                "9:16",
+                "1:1"
+            ],
+            "default_ratio": "9:16",
+            "duration_choices": [
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15
+            ],
+            "default_duration": 5,
+            "supports_audio": true,
+            "default_audio": true,
+            "supports_first_frame": true,
+            "supports_last_frame": true,
+            "max_reference_images": 0,
+            "form": "standard"
+        },
+        "kling_v3_omni.py": {
+            "canonical_id": "kling-v3-omni",
+            "resolution_choices": [
+                "720p",
+                "1080p",
+                "4K"
+            ],
+            "default_resolution": "720p",
+            "ratio_choices": [
+                "16:9",
+                "9:16",
+                "1:1"
+            ],
+            "default_ratio": "9:16",
+            "duration_choices": [
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15
+            ],
+            "default_duration": 5,
+            "supports_audio": true,
+            "default_audio": true,
+            "supports_first_frame": true,
+            "supports_last_frame": true,
+            "max_reference_images": 2,
+            "form": "standard"
+        },
+        "kling_video_o1.py": {
+            "canonical_id": "kling-video-o1",
+            "resolution_choices": [
+                "720p",
+                "1080p"
+            ],
+            "default_resolution": "720p",
+            "ratio_choices": [
+                "16:9",
+                "9:16",
+                "1:1"
+            ],
+            "default_ratio": "9:16",
+            "duration_choices": [
+                5,
+                10
+            ],
+            "default_duration": 5,
+            "supports_audio": false,
+            "default_audio": null,
+            "supports_first_frame": true,
+            "supports_last_frame": true,
+            "max_reference_images": 0,
+            "form": "standard"
+        },
+        "kling_v2_6_motion_control.py": {
+            "canonical_id": "kling-v2-6-motion-control",
+            "resolution_choices": [],
+            "default_resolution": null,
+            "ratio_choices": [],
+            "default_ratio": null,
+            "duration_choices": [],
+            "default_duration": null,
+            "supports_audio": false,
+            "default_audio": null,
+            "supports_first_frame": false,
+            "supports_last_frame": false,
+            "max_reference_images": 0,
+            "form": "motion"
+        },
+        "kling_v3_motion_control.py": {
+            "canonical_id": "kling-v3-motion-control",
+            "resolution_choices": [],
+            "default_resolution": null,
+            "ratio_choices": [],
+            "default_ratio": null,
+            "duration_choices": [],
+            "default_duration": null,
+            "supports_audio": false,
+            "default_audio": null,
+            "supports_first_frame": false,
+            "supports_last_frame": false,
+            "max_reference_images": 0,
+            "form": "motion"
+        }
+    }
+}
