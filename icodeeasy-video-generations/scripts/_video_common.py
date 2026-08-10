@@ -13,6 +13,7 @@ import re
 import secrets
 import socket
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -26,6 +27,9 @@ OFFICIAL_HOSTS = frozenset(
 )
 KEY_ENV_ORDER = ("OPENAI_API_KEY", "ANTHROPIC_AUTH_TOKEN")
 MAX_IDEMPOTENCY_KEY_LENGTH = 128
+MAX_DOWNLOAD_REDIRECTS = 1
+TASK_STATUSES_IN_PROGRESS = frozenset({"queued", "running"})
+TASK_STATUSES_TERMINAL = frozenset({"succeeded", "failed"})
 
 
 class UserError(Exception):
@@ -343,6 +347,249 @@ def request_json(
         raise ProtocolError(
             f"Response was not valid JSON: {message}", status=status
         ) from None
+
+
+def task_url(base_url: str, task_id: str, suffix: str = "") -> str:
+    """Build one task URL while keeping the opaque ID in one path segment."""
+
+    if not task_id:
+        raise UserError("Task ID must not be empty.")
+    if suffix and not suffix.startswith("/"):
+        suffix = "/" + suffix
+    encoded_id = urllib.parse.quote(task_id, safe="")
+    return f"{base_url.rstrip('/')}/v1/videos/generations/{encoded_id}{suffix}"
+
+
+def _task_object(response: Any) -> dict[str, Any]:
+    if not isinstance(response, dict):
+        raise ProtocolError("Task response must be a JSON object.", response=response)
+    return response
+
+
+def poll_task(
+    base_url: str,
+    task_id: str,
+    api_key: str | None = None,
+    *,
+    wait: bool = False,
+    interval: float = 5,
+    max_wait: float = 900,
+    timeout: float = 60,
+) -> dict[str, Any]:
+    """Fetch a task once or wait while it remains queued/running."""
+
+    started = time.monotonic()
+    while True:
+        _status, response = request_json(
+            "GET", task_url(base_url, task_id), api_key, timeout=timeout
+        )
+        task = _task_object(response)
+        status = task.get("status")
+        if not wait or status in TASK_STATUSES_TERMINAL:
+            return task
+        if status not in TASK_STATUSES_IN_PROGRESS:
+            return task
+
+        elapsed = time.monotonic() - started
+        if elapsed + interval > max_wait:
+            raise ProtocolError(
+                "Maximum wait reached before the task completed.", response=task
+            )
+        time.sleep(interval)
+
+
+def delete_task(
+    base_url: str,
+    task_id: str,
+    api_key: str | None = None,
+    *,
+    timeout: float = 60,
+) -> Any:
+    """Delete one existing task with exactly one HTTP request."""
+
+    _status, response = request_json(
+        "DELETE", task_url(base_url, task_id), api_key, timeout=timeout
+    )
+    return response
+
+
+def _origin(url: str) -> tuple[str, str, int | None]:
+    parsed = urllib.parse.urlsplit(url)
+    return parsed.scheme.lower(), (parsed.hostname or "").lower(), parsed.port
+
+
+def _validate_download_redirect(current_url: str, location: str) -> str:
+    """Resolve one download redirect without weakening the transport boundary."""
+
+    redirected = urllib.parse.urljoin(current_url, location)
+    try:
+        current = urllib.parse.urlsplit(current_url)
+        parsed = urllib.parse.urlsplit(redirected)
+        _ = parsed.port
+    except ValueError as exc:
+        raise ProtocolError(f"Invalid download redirect: {exc}") from None
+    if (
+        parsed.scheme.lower() not in {"http", "https"}
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+    ):
+        raise ProtocolError("Invalid download redirect URL.")
+    current_scheme = current.scheme.lower()
+    redirected_scheme = parsed.scheme.lower()
+    if current_scheme == "https" and redirected_scheme == "http":
+        raise ProtocolError("Refusing HTTPS to HTTP download redirect.")
+    if redirected_scheme == "http" and (
+        current_scheme != "http"
+        or not current.hostname
+        or not _is_loopback(current.hostname)
+        or not _is_loopback(parsed.hostname)
+    ):
+        raise ProtocolError(
+            "HTTP download redirects must remain within explicitly authorized "
+            "loopback hosts."
+        )
+    return redirected
+
+
+def _download_error(exc: urllib.error.HTTPError, api_key: str | None) -> ProtocolError:
+    try:
+        body = exc.read()
+    finally:
+        exc.close()
+    text = body.decode("utf-8", errors="replace")
+    try:
+        parsed: Any = json.loads(text)
+    except json.JSONDecodeError:
+        parsed = {"error": {"message": text or exc.reason}}
+    parsed = _sanitize_response(parsed, api_key)
+    code = _error_code(parsed)
+    detail = _sanitize_text(
+        json.dumps(parsed, ensure_ascii=False, separators=(",", ":")), api_key
+    )
+    return ProtocolError(
+        f"HTTP {exc.code}: {detail}",
+        status=exc.code,
+        error_code=code,
+        response=parsed,
+    )
+
+
+def download_task(
+    base_url: str,
+    task_id: str,
+    output: str | os.PathLike[str],
+    api_key: str | None = None,
+    *,
+    overwrite: bool = False,
+    timeout: float = 60,
+) -> Path:
+    """Download task content privately, then atomically publish the completed file."""
+
+    destination = Path(output).expanduser()
+    part = Path(str(destination) + ".part")
+    if destination.exists() and not overwrite:
+        raise UserError(f"Output exists; use --overwrite to replace it: {destination}")
+    if part.exists():
+        raise UserError(f"Refusing to overwrite existing partial file: {part}")
+    if not destination.parent.is_dir():
+        raise UserError(f"Output directory does not exist: {destination.parent}")
+
+    url = task_url(base_url, task_id, "/content")
+    authorization = f"Bearer {api_key}" if api_key else None
+    redirects = 0
+    response: Any = None
+
+    while True:
+        headers = {"Accept": "video/mp4"}
+        if authorization:
+            headers["Authorization"] = authorization
+        request = urllib.request.Request(url, headers=headers, method="GET")
+        try:
+            response = _NO_REDIRECT_OPENER.open(request, timeout=timeout)
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code not in {301, 302, 303, 307, 308}:
+                raise _download_error(exc, api_key) from None
+            location = exc.headers.get("Location")
+            exc.close()
+            if not location:
+                raise ProtocolError(
+                    "Download redirect did not include a Location header."
+                )
+            if redirects >= MAX_DOWNLOAD_REDIRECTS:
+                raise ProtocolError("Download redirect limit exceeded.")
+            redirected = _validate_download_redirect(url, location)
+            if _origin(redirected) != _origin(url):
+                authorization = None
+            url = redirected
+            redirects += 1
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            socket.timeout,
+            http.client.RemoteDisconnected,
+            ConnectionError,
+            OSError,
+        ) as exc:
+            reason = getattr(exc, "reason", exc)
+            raise ProtocolError(
+                f"Network error: {_sanitize_text(str(reason), api_key)}"
+            ) from None
+
+    created_part = False
+    try:
+        if response.status not in {200, 206}:
+            raise ProtocolError(
+                f"Unexpected download HTTP status: {response.status}",
+                status=response.status,
+            )
+        expected_length_text = response.headers.get("Content-Length")
+        try:
+            expected_length = (
+                int(expected_length_text)
+                if expected_length_text is not None
+                else None
+            )
+        except ValueError:
+            raise ProtocolError("Download Content-Length was not an integer.") from None
+        fd = os.open(part, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        created_part = True
+        received = 0
+        with os.fdopen(fd, "wb") as file_handle:
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                file_handle.write(chunk)
+                received += len(chunk)
+            file_handle.flush()
+            os.fsync(file_handle.fileno())
+        if expected_length is not None and received != expected_length:
+            raise ProtocolError(
+                f"Truncated download: expected {expected_length} bytes, received {received}."
+            )
+        os.chmod(part, 0o600)
+        if destination.exists() and not overwrite:
+            raise UserError(
+                f"Output appeared during download; use --overwrite: {destination}"
+            )
+        os.replace(part, destination)
+        created_part = False
+        return destination
+    except (ProtocolError, UserError):
+        raise
+    except (OSError, http.client.IncompleteRead) as exc:
+        raise ProtocolError(
+            f"Download failed: {_sanitize_text(str(exc), api_key)}"
+        ) from None
+    finally:
+        response.close()
+        if created_part:
+            try:
+                part.unlink()
+            except FileNotFoundError:
+                pass
 
 
 def emit_result(result: Mapping[str, Any], *, json_mode: bool) -> None:
