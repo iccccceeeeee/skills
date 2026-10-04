@@ -54,3 +54,18 @@ export OPENAI_API_KEY="<your-api-key>"
 ```
 
 在 Codex 中调用 `$icodeeasy-video-generations` 并描述要生成的视频。创建任务会产生付费调用；只在用户明确授权后使用 `--confirm-paid`，不确定时先用 `--dry-run`。视频与临时下载保存在 `out/`，默认不提交。
+
+已安装用户需要更新：上面的安装命令在目录存在时会直接跳过。下面的命令下载并校验解包成功后，覆盖视频 skill 的仓库文件；保留本地额外文件。完成后重启 Codex。
+
+```bash
+(
+  update_dir=$(mktemp -d) || exit 1
+  trap 'rm -rf "$update_dir"' EXIT
+  curl -fL https://github.com/iccccceeeeee/skills/archive/refs/heads/main.tar.gz -o "$update_dir/skills.tar.gz" &&
+  tar -xzf "$update_dir/skills.tar.gz" -C "$update_dir" skills-main/icodeeasy-video-generations &&
+  mkdir -p ~/.codex/skills/icodeeasy-video-generations &&
+  cp -R "$update_dir/skills-main/icodeeasy-video-generations/." ~/.codex/skills/icodeeasy-video-generations/
+)
+```
+
+下载前先创建输出目录，例如 `mkdir -p ./out`。查询或下载失败不代表生成失败。保留任务 ID，用 `video_task.py poll` 或 `download` 恢复原任务；也可在 API Key 所属账号的[日志明细](https://icodeeasy.cc/dashboard/logs/)预览、下载已成功的视频。不要因此重新生成。

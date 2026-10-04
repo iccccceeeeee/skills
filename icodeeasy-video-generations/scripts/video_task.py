@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import sys
 
 from _video_common import (
     ProtocolError,
@@ -12,6 +11,7 @@ from _video_common import (
     delete_task,
     download_task,
     emit_result,
+    emit_operation_error,
     normalize_base_url,
     poll_task,
     positive_float,
@@ -98,7 +98,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
     except (UserError, ProtocolError) as exc:
-        print(str(exc), file=sys.stderr)
+        emit_operation_error(
+            exc, json_mode=args.json, accepted_task_id=args.task_id, stage=args.command,
+        )
         return 1
 
 

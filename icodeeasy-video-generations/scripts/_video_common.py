@@ -28,7 +28,7 @@ OFFICIAL_HOSTS = frozenset(
 )
 KEY_ENV_ORDER = ("OPENAI_API_KEY", "ANTHROPIC_AUTH_TOKEN")
 MAX_IDEMPOTENCY_KEY_LENGTH = 128
-MAX_DOWNLOAD_REDIRECTS = 1
+MAX_DOWNLOAD_REDIRECTS = 2
 TASK_STATUSES_IN_PROGRESS = frozenset({"queued", "running"})
 TASK_STATUSES_TERMINAL = frozenset({"succeeded", "failed"})
 LOCAL_REFERENCE_HOSTS = frozenset(
@@ -59,12 +59,14 @@ class ProtocolError(Exception):
         status: int | None = None,
         error_code: str | None = None,
         response: Any = None,
+        task: Any = None,
         uncertain: bool = False,
     ) -> None:
         super().__init__(message)
         self.status = status
         self.error_code = error_code
         self.response = response
+        self.task = task
         self.uncertain = uncertain
 
 
@@ -291,6 +293,8 @@ def run_standard_model(spec: StandardModelSpec, argv: list[str] | None = None) -
     args = build_standard_parser(spec).parse_args(argv)
     idempotency_key: str | None = None
     accepted_task_id: str | None = None
+    stage = "submission"
+    task_status: str | None = None
     try:
         payload = build_standard_payload(spec, args)
         if args.dry_run:
@@ -320,16 +324,20 @@ def run_standard_model(spec: StandardModelSpec, argv: list[str] | None = None) -
             headers={"Idempotency-Key": idempotency_key},
             timeout=args.timeout,
         )
-        task = _task_object(response)
+        task = _task_object(response, uncertain=True)
         task_id = task.get("id")
         if not isinstance(task_id, str) or not task_id:
-            raise ProtocolError("Create response did not include a task id.", response=task)
+            raise ProtocolError("Create response did not include a task id.", response=task, uncertain=True)
         accepted_task_id = task_id
+        task_status = task.get("status")
+        if not args.json:
+            print(f"Accepted task_id: {task_id}. Poll or download this task to recover.", file=sys.stderr)
         result = dict(task)
         result["idempotency_key"] = idempotency_key
         result.setdefault("summary", f"Task created: {task_id}")
 
         if args.command == "run":
+            stage = "poll"
             task = poll_task(
                 base_url,
                 task_id,
@@ -342,11 +350,13 @@ def run_standard_model(spec: StandardModelSpec, argv: list[str] | None = None) -
             result = dict(task)
             result["idempotency_key"] = idempotency_key
             status = task.get("status")
+            task_status = status
             if status != "succeeded":
                 result.setdefault("summary", f"Task {task_id} ended with status {status}.")
                 emit_result(result, json_mode=args.json)
                 return 1
             if args.output:
+                stage = "download"
                 output = download_task(
                     base_url,
                     task_id,
@@ -361,11 +371,13 @@ def run_standard_model(spec: StandardModelSpec, argv: list[str] | None = None) -
         emit_result(result, json_mode=args.json)
         return 0
     except (UserError, ProtocolError) as exc:
-        _emit_runner_error(
+        emit_operation_error(
             exc,
             json_mode=args.json,
             idempotency_key=idempotency_key,
             accepted_task_id=accepted_task_id,
+            stage=stage,
+            task_status=task_status,
         )
         return 1
 
@@ -376,6 +388,8 @@ def run_motion_model(spec: MotionModelSpec, argv: list[str] | None = None) -> in
     args = build_motion_parser(spec).parse_args(argv)
     idempotency_key: str | None = None
     accepted_task_id: str | None = None
+    stage = "submission"
+    task_status: str | None = None
     try:
         payload = build_motion_payload(spec, args)
         if args.dry_run:
@@ -405,16 +419,20 @@ def run_motion_model(spec: MotionModelSpec, argv: list[str] | None = None) -> in
             headers={"Idempotency-Key": idempotency_key},
             timeout=args.timeout,
         )
-        task = _task_object(response)
+        task = _task_object(response, uncertain=True)
         task_id = task.get("id")
         if not isinstance(task_id, str) or not task_id:
-            raise ProtocolError("Create response did not include a task id.", response=task)
+            raise ProtocolError("Create response did not include a task id.", response=task, uncertain=True)
         accepted_task_id = task_id
+        task_status = task.get("status")
+        if not args.json:
+            print(f"Accepted task_id: {task_id}. Poll or download this task to recover.", file=sys.stderr)
         result = dict(task)
         result["idempotency_key"] = idempotency_key
         result.setdefault("summary", f"Task created: {task_id}")
 
         if args.command == "run":
+            stage = "poll"
             task = poll_task(
                 base_url,
                 task_id,
@@ -427,11 +445,13 @@ def run_motion_model(spec: MotionModelSpec, argv: list[str] | None = None) -> in
             result = dict(task)
             result["idempotency_key"] = idempotency_key
             status = task.get("status")
+            task_status = status
             if status != "succeeded":
                 result.setdefault("summary", f"Task {task_id} ended with status {status}.")
                 emit_result(result, json_mode=args.json)
                 return 1
             if args.output:
+                stage = "download"
                 output = download_task(
                     base_url,
                     task_id,
@@ -446,36 +466,74 @@ def run_motion_model(spec: MotionModelSpec, argv: list[str] | None = None) -> in
         emit_result(result, json_mode=args.json)
         return 0
     except (UserError, ProtocolError) as exc:
-        _emit_runner_error(
+        emit_operation_error(
             exc,
             json_mode=args.json,
             idempotency_key=idempotency_key,
             accepted_task_id=accepted_task_id,
+            stage=stage,
+            task_status=task_status,
         )
         return 1
 
 
-def _emit_runner_error(
+def emit_operation_error(
     error: UserError | ProtocolError,
     *,
     json_mode: bool,
-    idempotency_key: str | None,
-    accepted_task_id: str | None,
+    idempotency_key: str | None = None,
+    accepted_task_id: str | None = None,
+    stage: str,
+    task_status: str | None = None,
 ) -> None:
-    """Report a failed create/run while preserving safe recovery identifiers."""
+    """Keep task state separate from a failed query or file retrieval."""
+
+    result: dict[str, Any] = {"error": {"message": str(error), "stage": stage}}
+    if isinstance(error, ProtocolError):
+        if error.status is not None:
+            result["error"]["http_status"] = error.status
+        if error.error_code is not None:
+            result["error"]["code"] = error.error_code
+        if error.uncertain:
+            result["error"]["uncertain"] = True
+        last_task = error.task if isinstance(error.task, dict) else error.response
+        if isinstance(last_task, dict) and last_task.get("id") == accepted_task_id:
+            last_status = last_task.get("status")
+            if isinstance(last_status, str) and last_status in TASK_STATUSES_IN_PROGRESS | TASK_STATUSES_TERMINAL:
+                task_status = last_status
+    if idempotency_key is not None:
+        result["idempotency_key"] = idempotency_key
+    if accepted_task_id is not None:
+        result["task_id"] = accepted_task_id
+        if isinstance(task_status, str) and task_status in TASK_STATUSES_IN_PROGRESS | TASK_STATUSES_TERMINAL:
+            result["status"] = task_status
+        if stage == "poll":
+            result["recovery_action"] = "poll"
+            result["summary"] = (
+                "Task status could not be confirmed. Retry polling the same task ID; "
+                "do not create another paid task."
+            )
+        elif stage == "download":
+            result["recovery_action"] = "download"
+            result["summary"] = (
+                "Video generation succeeded, but download did not complete. "
+                if task_status == "succeeded" else
+                "Video download did not complete; this does not establish a generation failure. "
+            ) + "Retry downloading the same task ID; do not create another paid task."
+    elif isinstance(error, ProtocolError) and error.uncertain and idempotency_key is not None:
+        result["recovery_action"] = "reuse_idempotency_key"
+        result["summary"] = (
+            "Submission outcome is unknown. Retain the original idempotency key "
+            "and reuse it with the same request to recover; do not submit with a fresh key."
+        )
 
     if json_mode:
-        result: dict[str, Any] = {"error": {"message": str(error)}}
-        if idempotency_key is not None:
-            result["idempotency_key"] = idempotency_key
-        if accepted_task_id is not None:
-            result["task_id"] = accepted_task_id
         emit_result(result, json_mode=True)
         return
 
-    context: list[str] = [str(error)]
+    context = [result["summary"], str(error)] if "summary" in result else [str(error)]
     if accepted_task_id is not None:
-        context.append(f"Accepted task_id: {accepted_task_id}.")
+        context.append(f"Task ID: {accepted_task_id}.")
     if idempotency_key is not None:
         context.append(f"Idempotency key: {idempotency_key}.")
     print(" ".join(context), file=sys.stderr)
@@ -759,34 +817,16 @@ def request_json(
             status = response.status
             body = response.read()
     except urllib.error.HTTPError as exc:
-        try:
-            body = exc.read()
-        finally:
-            exc.close()
-        text = body.decode("utf-8", errors="replace")
-        try:
-            parsed: Any = json.loads(text)
-        except json.JSONDecodeError:
-            parsed = {"error": {"message": text or exc.reason}}
-        parsed = _sanitize_response(parsed, api_key)
-        code = _error_code(parsed)
-        detail = json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
-        detail = _sanitize_text(detail, api_key)
-        uncertain = method == "POST" and (
-            exc.code >= 500 or code == "submission_unknown"
+        error = _http_error(exc, api_key)
+        error.uncertain = method == "POST" and (
+            exc.code >= 500 or error.error_code == "submission_unknown"
         )
-        raise ProtocolError(
-            f"HTTP {exc.code}: {detail}",
-            status=exc.code,
-            error_code=code,
-            response=parsed,
-            uncertain=uncertain,
-        ) from None
+        raise error from None
     except (
         urllib.error.URLError,
         TimeoutError,
         socket.timeout,
-        http.client.RemoteDisconnected,
+        http.client.HTTPException,
         ConnectionError,
         OSError,
     ) as exc:
@@ -803,7 +843,7 @@ def request_json(
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         message = _sanitize_text(str(exc), api_key)
         raise ProtocolError(
-            f"Response was not valid JSON: {message}", status=status
+            f"Response was not valid JSON: {message}", status=status, uncertain=method == "POST"
         ) from None
 
 
@@ -815,12 +855,12 @@ def task_url(base_url: str, task_id: str, suffix: str = "") -> str:
     if suffix and not suffix.startswith("/"):
         suffix = "/" + suffix
     encoded_id = urllib.parse.quote(task_id, safe="")
-    return f"{base_url.rstrip('/')}/v1/videos/generations/{encoded_id}{suffix}"
+    return f"{base_url.rstrip('/')}/v1/videos/tasks/{encoded_id}{suffix}"
 
 
-def _task_object(response: Any) -> dict[str, Any]:
+def _task_object(response: Any, *, uncertain: bool = False) -> dict[str, Any]:
     if not isinstance(response, dict):
-        raise ProtocolError("Task response must be a JSON object.", response=response)
+        raise ProtocolError("Task response must be a JSON object.", response=response, uncertain=uncertain)
     return response
 
 
@@ -837,11 +877,17 @@ def poll_task(
     """Fetch a task once or wait while it remains queued/running."""
 
     started = time.monotonic()
+    last_task = None
     while True:
-        _status, response = request_json(
-            "GET", task_url(base_url, task_id), api_key, timeout=timeout
-        )
-        task = _task_object(response)
+        try:
+            _status, response = request_json(
+                "GET", task_url(base_url, task_id), api_key, timeout=timeout
+            )
+            task = _task_object(response)
+        except ProtocolError as error:
+            error.task = last_task
+            raise
+        last_task = task
         status = task.get("status")
         if not wait or status in TASK_STATUSES_TERMINAL:
             return task
@@ -851,7 +897,7 @@ def poll_task(
         elapsed = time.monotonic() - started
         if elapsed + interval > max_wait:
             raise ProtocolError(
-                "Maximum wait reached before the task completed.", response=task
+                "Maximum wait reached before the task completed.", response=task, task=task
             )
         time.sleep(interval)
 
@@ -910,9 +956,13 @@ def _validate_download_redirect(current_url: str, location: str) -> str:
     return redirected
 
 
-def _download_error(exc: urllib.error.HTTPError, api_key: str | None) -> ProtocolError:
+def _http_error(exc: urllib.error.HTTPError, api_key: str | None) -> ProtocolError:
     try:
         body = exc.read()
+    except http.client.IncompleteRead as error:
+        body = error.partial
+    except (OSError, http.client.HTTPException):
+        body = b""
     finally:
         exc.close()
     text = body.decode("utf-8", errors="replace")
@@ -968,7 +1018,7 @@ def download_task(
             break
         except urllib.error.HTTPError as exc:
             if exc.code not in {301, 302, 303, 307, 308}:
-                raise _download_error(exc, api_key) from None
+                raise _http_error(exc, api_key) from None
             location = exc.headers.get("Location")
             exc.close()
             if not location:
@@ -986,7 +1036,7 @@ def download_task(
             urllib.error.URLError,
             TimeoutError,
             socket.timeout,
-            http.client.RemoteDisconnected,
+            http.client.HTTPException,
             ConnectionError,
             OSError,
         ) as exc:
@@ -1002,6 +1052,9 @@ def download_task(
                 f"Unexpected download HTTP status: {response.status}",
                 status=response.status,
             )
+        content_type = response.headers.get("Content-Type", "").lower()
+        if content_type.startswith("text/") or any(kind in content_type for kind in ("json", "html", "xml")):
+            raise ProtocolError("Download returned a document instead of video content.", status=response.status)
         expected_length_text = response.headers.get("Content-Length")
         try:
             expected_length = (
@@ -1019,10 +1072,14 @@ def download_task(
                 chunk = response.read(1024 * 1024)
                 if not chunk:
                     break
+                if received == 0 and chunk.lstrip().startswith((b"{", b"[", b"<")):
+                    raise ProtocolError("Download returned JSON or HTML instead of video content.", status=response.status)
                 file_handle.write(chunk)
                 received += len(chunk)
             file_handle.flush()
             os.fsync(file_handle.fileno())
+        if received == 0:
+            raise ProtocolError("Download returned empty video content.", status=response.status)
         if expected_length is not None and received != expected_length:
             raise ProtocolError(
                 f"Truncated download: expected {expected_length} bytes, received {received}."
@@ -1043,7 +1100,7 @@ def download_task(
         return destination
     except (ProtocolError, UserError):
         raise
-    except (OSError, http.client.IncompleteRead) as exc:
+    except (OSError, http.client.HTTPException) as exc:
         raise ProtocolError(
             f"Download failed: {_sanitize_text(str(exc), api_key)}"
         ) from None

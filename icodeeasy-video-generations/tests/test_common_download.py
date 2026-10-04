@@ -31,9 +31,11 @@ class _DownloadServer:
     def __init__(self) -> None:
         self.requests: list[dict[str, str | None]] = []
         self.redirect_target: str | None = None
+        self.redirect_paths: dict[str, str] = {}
         self.redirect_forever = False
         self.status = 200
         self.body = MP4
+        self.content_type = "video/mp4"
         self.claimed_length: int | None = None
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
@@ -60,8 +62,8 @@ class _DownloadServer:
                         "authorization": self.headers.get("Authorization"),
                     }
                 )
-                if owner.redirect_target is not None:
-                    target = owner.redirect_target
+                if owner.redirect_target is not None or self.path in owner.redirect_paths:
+                    target = owner.redirect_paths.get(self.path, owner.redirect_target)
                     if owner.redirect_forever:
                         target = owner.base_url + "/redirect-again"
                     self.send_response(302)
@@ -71,7 +73,7 @@ class _DownloadServer:
                     return
 
                 self.send_response(owner.status)
-                self.send_header("Content-Type", "video/mp4")
+                self.send_header("Content-Type", owner.content_type)
                 length = owner.claimed_length
                 self.send_header("Content-Length", str(length or len(owner.body)))
                 self.end_headers()
@@ -126,7 +128,21 @@ class DownloadTests(unittest.TestCase):
             self.assertIsNone(target.requests[0]["authorization"])
             self.assertEqual(output.read_bytes(), MP4)
 
-    def test_more_than_one_redirect_is_rejected(self) -> None:
+    def test_signed_relay_file_then_storage_redirect_downloads_same_video(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp, _DownloadServer() as media, _DownloadServer() as api:
+            api.redirect_paths = {
+                "/v1/videos/tasks/vid_1/content": "/v1/videos/files/signed-fixture",
+                "/v1/videos/files/signed-fixture": media.base_url + "/video.mp4",
+            }
+            output = Path(tmp) / "video.mp4"
+            download_task(api.base_url, "vid_1", output, "redirect-secret", timeout=1)
+            self.assertEqual(output.read_bytes(), MP4)
+            self.assertEqual([r["path"] for r in api.requests], list(api.redirect_paths))
+            self.assertTrue(all(r["authorization"] == "Bearer redirect-secret" for r in api.requests))
+            self.assertIsNone(media.requests[0]["authorization"])
+            self.assertFalse(Path(str(output) + ".part").exists())
+
+    def test_more_than_two_redirects_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp, _DownloadServer() as api:
             api.redirect_target = api.base_url + "/redirect-again"
             api.redirect_forever = True
@@ -134,14 +150,14 @@ class DownloadTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ProtocolError, "redirect"):
                 download_task(api.base_url, "vid_1", output, "secret", timeout=1)
-            self.assertEqual(len(api.requests), 2)
+            self.assertEqual(len(api.requests), 3)
             self.assertFalse(output.exists())
 
     def test_https_to_http_redirect_is_rejected_before_target_request(self) -> None:
         with _DownloadServer() as target:
             with self.assertRaisesRegex(ProtocolError, "HTTPS.*HTTP"):
                 _validate_download_redirect(
-                    "https://api.icodeeasy.cc/v1/videos/generations/vid_1/content",
+                    "https://api.icodeeasy.cc/v1/videos/tasks/vid_1/content",
                     target.base_url + "/media.mp4",
                 )
 
@@ -150,7 +166,7 @@ class DownloadTests(unittest.TestCase):
     def test_loopback_http_download_cannot_redirect_to_non_loopback_http(self) -> None:
         with self.assertRaisesRegex(ProtocolError, "loopback"):
             _validate_download_redirect(
-                "http://127.0.0.1:8123/v1/videos/generations/vid_1/content",
+                "http://127.0.0.1:8123/v1/videos/tasks/vid_1/content",
                 "http://192.0.2.10/media.mp4",
             )
 
@@ -171,6 +187,24 @@ class DownloadTests(unittest.TestCase):
                 )
             self.assertEqual(output.read_bytes(), b"existing-good-video")
             self.assertFalse(Path(str(output) + ".part").exists())
+
+    def test_empty_json_or_html_response_is_not_published_as_a_video(self) -> None:
+        cases = (
+            (b"", "video/mp4"),
+            (b'{"error":"not a video"}', "application/json"),
+            (b'{"error":"not a video"}', "video/mp4"),
+            (b"<html>error</html>", "text/html"),
+            (b"<html>error</html>", "video/mp4"),
+        )
+        for body, content_type in cases:
+            with self.subTest(content_type=content_type, body=body), tempfile.TemporaryDirectory() as tmp, _DownloadServer() as api:
+                api.body, api.content_type = body, content_type
+                output = Path(tmp) / "video.mp4"
+                output.write_bytes(b"existing-good-video")
+                with self.assertRaises(ProtocolError):
+                    download_task(api.base_url, "vid_1", output, "secret", overwrite=True, timeout=1)
+                self.assertEqual(output.read_bytes(), b"existing-good-video")
+                self.assertFalse(Path(str(output) + ".part").exists())
 
     def test_existing_destination_is_refused_without_overwrite_before_request(self) -> None:
         with tempfile.TemporaryDirectory() as tmp, _DownloadServer() as api:

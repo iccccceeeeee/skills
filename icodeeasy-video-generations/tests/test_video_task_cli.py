@@ -67,6 +67,30 @@ class VideoTaskCLITests(unittest.TestCase):
                 result = _run(*_base_args(api.base_url), "poll", "vid_1", *options)
                 self.assertEqual(result.returncode, 1)
 
+    def test_poll_http_error_keeps_task_id_and_structured_json_recovery(self) -> None:
+        with _LifecycleServer([(404, {"error": {"code": "not_found"}})]) as api:
+            result = _run(*_base_args(api.base_url), "poll", "vid_1")
+        self.assertEqual(result.returncode, 1)
+        payload = json.loads(result.stdout)
+        self.assertEqual(result.stderr, "")
+        self.assertEqual(payload["task_id"], "vid_1")
+        self.assertEqual(payload["error"]["stage"], "poll")
+        self.assertEqual(payload["error"]["http_status"], 404)
+        self.assertEqual(payload["recovery_action"], "poll")
+        self.assertNotEqual(payload.get("status"), "failed")
+
+    def test_later_poll_failure_retains_last_confirmed_running_status(self) -> None:
+        with _LifecycleServer([
+            (200, {"id": "vid_1", "status": "running"}),
+            (503, {"error": {"code": "poll_failed"}}),
+        ]) as api:
+            result = _run(*_base_args(api.base_url), "poll", "vid_1", "--wait", "--interval", "0.001")
+        self.assertEqual(result.returncode, 1)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["status"], "running")
+        self.assertEqual(payload["error"]["http_status"], 503)
+        self.assertEqual(payload["recovery_action"], "poll")
+
     def test_delete_204_succeeds_and_unsafe_409_fails(self) -> None:
         with _LifecycleServer([(204, {})]) as api:
             result = _run(*_base_args(api.base_url), "delete", "vid_1")
@@ -76,7 +100,11 @@ class VideoTaskCLITests(unittest.TestCase):
         with _LifecycleServer([(409, error)]) as api:
             result = _run(*_base_args(api.base_url), "delete", "vid_1")
         self.assertEqual(result.returncode, 1)
-        self.assertIn("video_delete_unsafe", result.stderr)
+        self.assertEqual(result.stderr, "")
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["error"]["code"], "video_delete_unsafe")
+        self.assertEqual(payload["error"]["http_status"], 409)
+        self.assertEqual(payload["error"]["stage"], "delete")
 
     def test_download_requires_output_and_missing_auth_is_operational_failure(self) -> None:
         syntax = _run("download", "vid_1", api_key=None)

@@ -54,3 +54,18 @@ export OPENAI_API_KEY="<your-api-key>"
 ```
 
 In Codex, invoke `$icodeeasy-video-generations` and describe the video to create. Creating a task is a paid API call: use `--confirm-paid` only after explicit user authorization, and use `--dry-run` when unsure. Generated videos and temporary downloads belong in `out/` and are ignored by default.
+
+Existing installations need an update: the installation command above skips a directory that already exists. This downloads and successfully extracts the archive before replacing repository files in the video skill, while preserving additional local files. Restart Codex afterward.
+
+```bash
+(
+  update_dir=$(mktemp -d) || exit 1
+  trap 'rm -rf "$update_dir"' EXIT
+  curl -fL https://github.com/iccccceeeeee/skills/archive/refs/heads/main.tar.gz -o "$update_dir/skills.tar.gz" &&
+  tar -xzf "$update_dir/skills.tar.gz" -C "$update_dir" skills-main/icodeeasy-video-generations &&
+  mkdir -p ~/.codex/skills/icodeeasy-video-generations &&
+  cp -R "$update_dir/skills-main/icodeeasy-video-generations/." ~/.codex/skills/icodeeasy-video-generations/
+)
+```
+
+A polling or download error does not prove generation failed. Keep the task ID and recover the same task with `video_task.py poll` or `download`. Successful videos are also available in the API Key owner's [usage details](https://icodeeasy.cc/dashboard/logs/). Create the output directory first, for example with `mkdir -p ./out`; do not create another paid task to recover a file.

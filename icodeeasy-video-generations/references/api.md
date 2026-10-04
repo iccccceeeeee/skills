@@ -35,10 +35,15 @@ All model commands offer `create` and `run`:
 For a task that already exists, use the model-independent lifecycle tool:
 
 ```bash
+mkdir -p ./out
 python3 scripts/video_task.py poll TASK_ID --wait
 python3 scripts/video_task.py download TASK_ID --output ./out/video.mp4
 python3 scripts/video_task.py delete TASK_ID
 ```
+
+Creation uses `POST /v1/videos/generations`. Existing tasks use `GET /v1/videos/tasks/{id}`, `GET /v1/videos/tasks/{id}/content`, and `DELETE /v1/videos/tasks/{id}`. The API's `status_url` and `content_url` identify those canonical paths. Keep the API base and the opaque task ID; do not derive polling URLs from the creation path.
+
+Content retrieval may redirect twice: from the authenticated content endpoint to a signed relay file URL, then to stored media. The downloader follows up to two redirects, keeps authentication only within the API origin, and removes it permanently after a cross-origin redirect. HTTPS-to-HTTP redirects remain refused.
 
 ## Idempotency and retries
 
@@ -49,3 +54,11 @@ Every create request sends an `Idempotency-Key`. To recover from an uncertain su
 Use `--json` for machine-readable output. A task remains `queued` or `running` until it reaches `succeeded` or `failed`. `run` and `video_task.py poll --wait` accept `--interval` and `--max-wait`; use each command's `--help` for the full option set.
 
 Check the API response before attributing a failure. In particular, `401` usually means credentials are missing or invalid, `402` indicates unavailable balance or quota, `429` indicates rate limiting, and `5xx` indicates a service-side failure. Failed requests are not assumed to be free unless the API response says so.
+
+An unsuccessful CLI operation is distinct from an unsuccessful generation. JSON errors include `error.stage` (`submission`, `poll`, `download`, or `delete`) and HTTP status/error code when available. After an accepted create, they retain `task_id`, `idempotency_key`, the last confirmed task `status`, and a `recovery_action`:
+
+- `poll`: the latest status could not be confirmed. A 404 or timeout does not prove generation failed. Re-query the same task ID; do not start another paid task.
+- `download`: file retrieval failed. If `status` is `succeeded`, explicitly tell the user generation succeeded and retry only `video_task.py download TASK_ID --output ./out/video.mp4`.
+- `reuse_idempotency_key`: submission is uncertain and no task ID was received. Retain the original key and request payload for recovery; do not submit with a fresh key.
+
+The CLI still exits nonzero when the requested operation does not finish. Treat only a task's explicit `status: failed` as a confirmed generation failure. If file retrieval continues to fail, the API Key owner's [usage details](https://icodeeasy.cc/dashboard/logs/) provide a preview/download recovery entry for successful videos.

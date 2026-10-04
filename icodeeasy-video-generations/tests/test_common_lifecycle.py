@@ -79,7 +79,7 @@ class LifecycleTests(unittest.TestCase):
     def test_task_id_is_encoded_as_exactly_one_path_segment(self) -> None:
         self.assertEqual(
             task_url("https://api.icodeeasy.cc", "folder/id ?#", "/content"),
-            "https://api.icodeeasy.cc/v1/videos/generations/folder%2Fid%20%3F%23/content",
+            "https://api.icodeeasy.cc/v1/videos/tasks/folder%2Fid%20%3F%23/content",
         )
 
     def test_one_shot_poll_returns_first_task_without_waiting(self) -> None:
@@ -88,6 +88,7 @@ class LifecycleTests(unittest.TestCase):
 
         self.assertEqual(task["status"], "queued")
         self.assertEqual(len(api.requests), 1)
+        self.assertEqual(api.requests[0]["path"], "/v1/videos/tasks/vid_1")
 
     def test_wait_polls_until_succeeded(self) -> None:
         responses = [
@@ -146,6 +147,7 @@ class LifecycleTests(unittest.TestCase):
             result = delete_task(api.base_url, "vid_1", "secret", timeout=1)
         self.assertEqual(result, {})
         self.assertEqual(len(api.requests), 1)
+        self.assertEqual(api.requests[0]["path"], "/v1/videos/tasks/vid_1")
 
         error = {"error": {"code": "video_delete_unsafe"}}
         with _LifecycleServer([(409, error)]) as api:

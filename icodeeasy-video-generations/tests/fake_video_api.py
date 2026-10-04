@@ -28,6 +28,11 @@ class FakeVideoAPI(AbstractContextManager["FakeVideoAPI"]):
         self.created_task_count = 0
         self.redirect_target: str | None = None
         self.disconnect_after_create = False
+        self.truncate_create_response = False
+        self.invalid_create_response = False
+        self.invalid_http_status_after_create = False
+        self.create_error_status: int | None = None
+        self.truncate_error_response = False
         self.poll_error_status: int | None = None
         self.download_error_status: int | None = None
         self._server: _Server | None = None
@@ -51,12 +56,15 @@ class FakeVideoAPI(AbstractContextManager["FakeVideoAPI"]):
 
             def do_GET(self) -> None:
                 self._record(b"")
-                if self.path.startswith("/v1/videos/generations/"):
+                if self.path.startswith("/v1/videos/tasks/"):
                     if self.path.endswith("/content") and owner.download_error_status is not None:
                         self._json(
                             owner.download_error_status,
                             {"error": {"code": "download_failed"}},
                         )
+                        return
+                    if self.path.endswith("/content"):
+                        self._raw(200, b"\x00\x00\x00\x18ftypmp42" + b"video-data" * 10, "video/mp4")
                         return
                     if owner.poll_error_status is not None:
                         self._json(
@@ -158,6 +166,25 @@ class FakeVideoAPI(AbstractContextManager["FakeVideoAPI"]):
                     self.connection.shutdown(2)
                     self.connection.close()
                     return
+                if owner.invalid_http_status_after_create:
+                    self.wfile.write(b"invalid HTTP status line\r\n\r\n")
+                    self.close_connection = True
+                    return
+                if owner.invalid_create_response:
+                    self._json(202, [{"id": task_id, "status": "queued"}])
+                    return
+                if owner.create_error_status is not None:
+                    self._json(owner.create_error_status, {"error": {"code": "submission_unknown"}})
+                    return
+                if owner.truncate_create_response:
+                    body = json.dumps({"id": task_id, "status": "queued"}).encode()
+                    self.send_response(202)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body) + 100))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    self.close_connection = True
+                    return
                 self._json(202, {"id": task_id, "status": "queued"})
 
             def _json(self, status: int, payload: dict[str, Any]) -> None:
@@ -170,12 +197,15 @@ class FakeVideoAPI(AbstractContextManager["FakeVideoAPI"]):
             def _raw(self, status: int, body: bytes, content_type: str) -> None:
                 self.send_response(status)
                 self.send_header("Content-Type", content_type)
-                self.send_header("Content-Length", str(len(body)))
+                truncated = owner.truncate_error_response and status >= 400
+                self.send_header("Content-Length", str(len(body) + (100 if truncated else 0)))
                 self.end_headers()
                 try:
                     self.wfile.write(body)
                 except (BrokenPipeError, ConnectionResetError):
                     pass
+                if truncated:
+                    self.close_connection = True
 
         self._server = _Server(("127.0.0.1", 0), Handler)
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
