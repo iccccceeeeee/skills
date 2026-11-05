@@ -14,11 +14,11 @@ Skills 安装到 `~/.codex/skills/`。下面的安装命令使用 `curl` 和 `ta
 
 | Skill | 模型 | 调用示例 |
 | --- | --- | --- |
-| [image2](image2/SKILL.md) | Image 2 | `$image2 画一只窗台上的橘猫` |
-| [image25](image25/SKILL.md) | Image 2.5 | `$image25 把参考图背景改成海边` |
-| [image26](image26/SKILL.md) | Image 2.6 | `$image26 生成一张咖啡杯产品图` |
+| [image2-icodeeasy](image2-icodeeasy/SKILL.md) | Image 2 | `$image2-icodeeasy 画一只窗台上的橘猫` |
+| [image25-icodeeasy](image25-icodeeasy/SKILL.md) | Image 2.5 | `$image25-icodeeasy 把参考图背景改成海边` |
+| [image26-icodeeasy](image26-icodeeasy/SKILL.md) | Image 2.6 | `$image26-icodeeasy 生成一盏轻轻摇晃的灯笼 GIF` |
 
-每个 skill 包含独立脚本和说明，可单独安装。Image 2.5、2.6 默认使用 Flare，指定 Sunburst 时会切换对应模型。生成后会等待完成、下载并展示图片；编辑时附上参考图即可。
+每个 skill 包含独立脚本和说明，可单独安装。Image 2.5、2.6 默认使用 Flare，指定 Sunburst 时会切换对应模型。生成后会等待完成、下载并展示图片；编辑时附上参考图即可。`image26-icodeeasy` 支持文生 GIF，默认 9 帧、每帧 200 ms。
 
 一次安装或更新三个图片 skill，下载和解包成功后才覆盖已有文件。
 
@@ -27,8 +27,8 @@ Skills 安装到 `~/.codex/skills/`。下面的安装命令使用 `curl` 和 `ta
   update_dir=$(mktemp -d) || exit 1
   trap 'rm -rf "$update_dir"' EXIT
   curl -fL https://github.com/iccccceeeeee/skills/archive/refs/heads/main.tar.gz -o "$update_dir/skills.tar.gz" &&
-  tar -xzf "$update_dir/skills.tar.gz" -C "$update_dir" skills-main/image2 skills-main/image25 skills-main/image26 &&
-  for skill_name in image2 image25 image26; do
+  tar -xzf "$update_dir/skills.tar.gz" -C "$update_dir" skills-main/image2-icodeeasy skills-main/image25-icodeeasy skills-main/image26-icodeeasy &&
+  for skill_name in image2-icodeeasy image25-icodeeasy image26-icodeeasy; do
     mkdir -p "$HOME/.codex/skills/$skill_name" &&
     cp -R "$update_dir/skills-main/$skill_name/." "$HOME/.codex/skills/$skill_name/" || exit 1
   done

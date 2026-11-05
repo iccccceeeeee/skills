@@ -1,4 +1,0 @@
-interface:
-  display_name: "Image 2"
-  short_description: "Generate and edit images with Image 2 via iCodeEasy"
-  default_prompt: "Use $image2 to generate or edit the requested image and show the result."

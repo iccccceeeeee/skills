@@ -1,16 +1,16 @@
 ---
-name: image25
-description: Use when the user asks to generate or edit images with Image 2.5, GPT Image 2.5, or $image25 through iCodeEasy. Handles text prompts, reference images, waiting for results, and local image delivery.
+name: image2-icodeeasy
+description: Use when the user asks to generate or edit images with Image 2, GPT Image 2, or $image2-icodeeasy through iCodeEasy. Handles text prompts, reference images, waiting for results, and local image delivery.
 ---
 
-# Image 2.5
+# Image 2
 
-用户可以直接说“用 Image 2.5 画一只猫”，或调用 `$image25` 并描述画面。根据当前对话提取需求，执行生成或编辑，再展示图片。
+用户可以直接说“用 Image 2 画一只猫”，或调用 `$image2-icodeeasy` 并描述画面。根据当前对话提取需求，执行生成或编辑，再展示图片。
 
 ## 默认行为
 
-- 默认模型为 `gpt-image-2.5-flare`。用户明确指定 Sunburst 时使用 `gpt-image-2.5-sunburst`。
-- 默认生成一张图片，使用 `1k` 分辨率和 `auto` 画质设置。
+- 默认模型为 `gpt-image-2`。
+- 默认生成一张图片，使用 `1k` 分辨率和 `medium` 画质设置。
 - 用户没有指定参数时直接使用默认值。用户指定尺寸、比例或张数时，按 [API 参考](references/api.md) 选择参数。
 - 用户要多张图片时，逐张提交独立任务，每个任务设置 `n=1`。
 - 用户要求修改已有图片时，使用 `edit` 并附上参考图。参考图可以来自当前对话、本地文件或 HTTPS 链接。
@@ -43,7 +43,7 @@ python3 scripts/generate_image.py edit \
 
 ## 结果与恢复
 
-- 成功后展示下载图片的绝对路径，并简短说明使用了 Image 2.5。
+- 成功后展示下载图片的绝对路径，并简短说明使用了 Image 2。
 - 保存本次任务 ID。轮询超时、网络中断或下载失败时，继续查询和下载同一个任务。
 - 用 `poll <task_id> --wait --download-dir ./out/images --json` 恢复结果。已创建的任务不应因等待或下载失败而重复提交。
 - 图片链接长期有效，按持有链接即可访问的敏感信息处理。仅在用户需要时提供完整链接。

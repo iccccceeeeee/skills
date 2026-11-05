@@ -20,9 +20,9 @@ from test_generate_image import FakeAPI
 
 ROOT = Path(__file__).resolve().parents[2]
 VERSIONS = {
-    "image2": "gpt-image-2",
-    "image25": "gpt-image-2.5-flare",
-    "image26": "gpt-image-2.6-flare",
+    "image2-icodeeasy": "gpt-image-2",
+    "image25-icodeeasy": "gpt-image-2.5-flare",
+    "image26-icodeeasy": "gpt-image-2.6-flare",
 }
 PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6lAsAAAAASUVORK5CYII="
@@ -32,7 +32,7 @@ PNG = base64.b64decode(
 class StandaloneSkillTests(unittest.TestCase):
     def test_image2_accepts_the_requested_landscape_ratio(self):
         result = subprocess.run(
-            [sys.executable, str(ROOT / "image2/scripts/generate_image.py"),
+            [sys.executable, str(ROOT / "image2-icodeeasy/scripts/generate_image.py"),
              "generate", "--prompt", "A landscape coffee cup photograph",
              "--aspect-ratio", "16:9", "--dry-run", "--json"],
             capture_output=True, text=True,
@@ -55,7 +55,7 @@ class StandaloneSkillTests(unittest.TestCase):
                 body = json.loads(result.stdout)
                 self.assertEqual(body["payload"]["model"], model)
                 self.assertEqual(body["payload"]["image_size"], "1K")
-                self.assertEqual(body["payload"]["quality"], "medium" if name == "image2" else "auto")
+                self.assertEqual(body["payload"]["quality"], "medium" if model == "gpt-image-2" else "auto")
 
     def test_each_skill_generates_and_edits_then_downloads_the_same_task(self):
         for name, model in VERSIONS.items():
