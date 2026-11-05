@@ -10,25 +10,26 @@ Skills install into `~/.codex/skills/`. The commands below use `curl` and `tar`.
 
 ### Image generation
 
-Choose a standalone skill by version and describe the image you want.
+Choose a standalone skill for static images or GIFs and describe the result you want.
 
 | Skill | Model | Example |
 | --- | --- | --- |
 | [image2-icodeeasy](image2-icodeeasy/SKILL.md) | Image 2 | `$image2-icodeeasy paint a ginger cat on a windowsill` |
 | [image25-icodeeasy](image25-icodeeasy/SKILL.md) | Image 2.5 | `$image25-icodeeasy change the reference background to a beach` |
-| [image26-icodeeasy](image26-icodeeasy/SKILL.md) | Image 2.6 | `$image26-icodeeasy create a looping GIF of a swaying lantern` |
+| [image26-icodeeasy](image26-icodeeasy/SKILL.md) | Image 2.6 static images | `$image26-icodeeasy create a coffee cup product photo` |
+| [image26-gif-icodeeasy](image26-gif-icodeeasy/SKILL.md) | Image 2.6 GIF | `$image26-gif-icodeeasy create a looping GIF of a swaying lantern` |
 
-Each skill includes its own script and instructions and can be installed independently. Image 2.5 and 2.6 default to Flare; ask for Sunburst to use that variant. Skills wait for completion, download the image, and display it. Include a reference image when requesting a static edit. `image26-icodeeasy` also generates animated GIFs from text, with nine frames at 200 ms per frame by default.
+Each skill includes its own script and instructions and can be installed independently. Image 2.5 and 2.6 default to Flare; ask for Sunburst to use that variant. Skills wait for completion, download the image, and display it. Include a reference image when requesting a static edit. `image26-gif-icodeeasy` independently generates animated GIFs from text, with nine frames at 200 ms per frame by default.
 
-Install or update all three image skills in one command. Existing files are replaced after a successful download and extraction.
+Install or update all four image and GIF skills in one command. Existing files are replaced after a successful download and extraction.
 
 ```bash
 (
   update_dir=$(mktemp -d) || exit 1
   trap 'rm -rf "$update_dir"' EXIT
   curl -fL https://github.com/iccccceeeeee/skills/archive/refs/heads/main.tar.gz -o "$update_dir/skills.tar.gz" &&
-  tar -xzf "$update_dir/skills.tar.gz" -C "$update_dir" skills-main/image2-icodeeasy skills-main/image25-icodeeasy skills-main/image26-icodeeasy &&
-  for skill_name in image2-icodeeasy image25-icodeeasy image26-icodeeasy; do
+  tar -xzf "$update_dir/skills.tar.gz" -C "$update_dir" skills-main/image2-icodeeasy skills-main/image25-icodeeasy skills-main/image26-icodeeasy skills-main/image26-gif-icodeeasy &&
+  for skill_name in image2-icodeeasy image25-icodeeasy image26-icodeeasy image26-gif-icodeeasy; do
     mkdir -p "$HOME/.codex/skills/$skill_name" &&
     cp -R "$update_dir/skills-main/$skill_name/." "$HOME/.codex/skills/$skill_name/" || exit 1
   done

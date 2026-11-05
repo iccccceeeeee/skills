@@ -30,6 +30,18 @@ PNG = base64.b64decode(
 
 
 class StandaloneSkillTests(unittest.TestCase):
+    def test_static_image26_rejects_animation_flags(self):
+        script = ROOT / "image26-icodeeasy/scripts/generate_image.py"
+        for options in (("--format", "gif"), ("--frame-count", "9"),
+                        ("--frame-duration-ms", "200"), ("--frame-size", "512x512")):
+            with self.subTest(options=options):
+                result = subprocess.run([
+                    sys.executable, str(script), "generate", "--prompt", "A lantern",
+                    "--dry-run", "--json", *options,
+                ], capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+
+
     def test_image2_accepts_the_requested_landscape_ratio(self):
         result = subprocess.run(
             [sys.executable, str(ROOT / "image2-icodeeasy/scripts/generate_image.py"),

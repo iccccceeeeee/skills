@@ -8,7 +8,6 @@ import base64
 import json
 import mimetypes
 import os
-import re
 import shlex
 import sys
 import time
@@ -203,60 +202,7 @@ def collect_image_urls(args: argparse.Namespace) -> list[str]:
     return image_urls
 
 
-def build_gif_payload(args: argparse.Namespace, *, require_reference: bool) -> dict[str, Any]:
-    if require_reference or args.image_url or args.image_file:
-        raise UserError("GIF supports text-to-image generation without reference images.")
-    if args.n != 1:
-        raise UserError("Generate one GIF per task.")
-    if args.resolution or args.aspect_ratio:
-        raise UserError("Use --frame-size for GIF frame dimensions.")
-    frames = args.frame_count if args.frame_count is not None else 9
-    duration = args.frame_duration_ms if args.frame_duration_ms is not None else 200
-    if frames < 2 or frames > 16:
-        raise UserError("GIF frame count must be between 2 and 16.")
-    if duration < 20 or duration % 10:
-        raise UserError("GIF frame duration must be at least 20 ms in 10 ms steps.")
-    size = (args.frame_size or "auto").lower()
-    width, height = 512, 512
-    if size != "auto":
-        match = re.fullmatch(r"([1-9][0-9]*)x([1-9][0-9]*)", size)
-        if match is None:
-            raise UserError("GIF frame size must be auto or WIDTHxHEIGHT.")
-        width, height = (int(value) for value in match.groups())
-    if width % 16 or height % 16:
-        raise UserError("GIF frame dimensions must be multiples of 16.")
-    if max(width, height) > 3840:
-        raise UserError("GIF frame dimensions exceed the animation canvas limits.")
-    columns, rows = (4, 2)
-    if frames == 9:
-        columns, rows = (3, 3)
-    elif frames >= 13:
-        columns, rows = (4, 4)
-    elif frames >= 10:
-        columns, rows = (4, 3)
-    layouts = ((width * columns, height * rows), (width * rows, height * columns))
-    sheet_width, sheet_height = min(layouts, key=lambda dimensions: max(dimensions) / min(dimensions))
-    if (max(sheet_width, sheet_height) > 3840
-            or sheet_width * sheet_height > 8_294_400
-            or max(sheet_width, sheet_height) > 3 * min(sheet_width, sheet_height)):
-        raise UserError("GIF frame size and count exceed the animation canvas limits.")
-    return {
-        "model": args.model,
-        "prompt": args.prompt,
-        "n": 1,
-        "output_format": "gif",
-        "frame_count": frames,
-        "frame_duration_ms": duration,
-        "size": size,
-        "quality": args.quality or "auto",
-    }
-
-
 def build_payload(args: argparse.Namespace, *, require_reference: bool) -> dict[str, Any]:
-    if args.output_format == "gif":
-        return build_gif_payload(args, require_reference=require_reference)
-    if args.frame_count is not None or args.frame_duration_ms is not None or args.frame_size:
-        raise UserError("Frame options require --format gif.")
     image_urls = collect_image_urls(args)
     if require_reference and not image_urls:
         raise UserError("Edit requests require at least one --image-url or --image-file.")
@@ -451,11 +397,7 @@ def add_submit_args(parser: argparse.ArgumentParser, *, prompt_help: str) -> Non
     parser.add_argument("--prompt", required=True, help=prompt_help)
     parser.add_argument("--model", choices=MODELS, default=MODEL, help="image model")
     parser.add_argument("--n", type=positive_int, default=1, help="number of images; 2.5 and 2.6 require 1")
-    parser.add_argument("--resolution", choices=["1k", "2k", "4k"], help="PNG resolution; default 1k")
-    parser.add_argument("--format", dest="output_format", choices=["png", "gif"], default="png")
-    parser.add_argument("--frame-count", type=int, help="GIF frames, 2 to 16; default 9")
-    parser.add_argument("--frame-duration-ms", type=int, help="GIF frame duration; default 200 ms")
-    parser.add_argument("--frame-size", help="GIF frame dimensions, such as 512x512; default auto")
+    parser.add_argument("--resolution", choices=["1k", "2k", "4k"], default="1k", help="PNG resolution; default 1k")
     parser.add_argument("--quality", choices=["low", "medium", "high", "auto"], help="default: medium for GPT Image 2, auto for 2.5/2.6")
     parser.add_argument("--aspect-ratio", help="optional image ratio, such as 1:1 or 16:9")
     parser.add_argument(
