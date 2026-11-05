@@ -4,36 +4,46 @@ Codex skills for local workflows.
 
 English version: [README.en.md](README.en.md)
 
-每个 skill 都提供一条安装命令，直接拉到 `~/.codex/skills/`。安装命令只依赖常见的 `curl` 和 `tar`。
+Skills 安装到 `~/.codex/skills/`。下面的安装命令使用 `curl` 和 `tar`。
 
 ## Skills
 
-### `icodeeasy-image-generations`
+### 图片生成
 
-通过 iCodeEasy 的 OpenAI 兼容 Images API 生成和编辑图片。
+按版本选择独立 skill，直接描述想要的图片。
 
-安装到 Codex：
+| Skill | 模型 | 调用示例 |
+| --- | --- | --- |
+| [image2](image2/SKILL.md) | Image 2 | `$image2 画一只窗台上的橘猫` |
+| [image25](image25/SKILL.md) | Image 2.5 | `$image25 把参考图背景改成海边` |
+| [image26](image26/SKILL.md) | Image 2.6 | `$image26 生成一张咖啡杯产品图` |
+
+每个 skill 包含独立脚本和说明，可单独安装。Image 2.5、2.6 默认使用 Flare，指定 Sunburst 时会切换对应模型。生成后会等待完成、下载并展示图片；编辑时附上参考图即可。
+
+一次安装或更新三个图片 skill，下载和解包成功后才覆盖已有文件。
 
 ```bash
-if [ -d ~/.codex/skills/icodeeasy-image-generations ]; then echo "icodeeasy-image-generations 已安装"; else mkdir -p ~/.codex/skills && curl -L https://github.com/iccccceeeeee/skills/archive/refs/heads/main.tar.gz | tar -xz -C ~/.codex/skills --strip-components=1 skills-main/icodeeasy-image-generations; fi
+(
+  update_dir=$(mktemp -d) || exit 1
+  trap 'rm -rf "$update_dir"' EXIT
+  curl -fL https://github.com/iccccceeeeee/skills/archive/refs/heads/main.tar.gz -o "$update_dir/skills.tar.gz" &&
+  tar -xzf "$update_dir/skills.tar.gz" -C "$update_dir" skills-main/image2 skills-main/image25 skills-main/image26 &&
+  for skill_name in image2 image25 image26; do
+    mkdir -p "$HOME/.codex/skills/$skill_name" &&
+    cp -R "$update_dir/skills-main/$skill_name/." "$HOME/.codex/skills/$skill_name/" || exit 1
+  done
+)
 ```
 
-安装或更新后，重启 Codex，让它重新发现 skill。
-
-配置 API Key：
+配置 API Key 后，在新聊天中直接调用对应 skill。
 
 ```bash
 export OPENAI_API_KEY="<your-api-key>"
 ```
 
-使用：
+认证也兼容 `ANTHROPIC_AUTH_TOKEN`。图片与下载输出放在项目的 `out/images/`。图片结果链接长期有效，按敏感信息处理。
 
-- 在 Codex 里直接说 `$icodeeasy-image-generations`，然后描述要生成或编辑的图片。
-- 如果要编辑图片，把参考图路径或 URL 一起给 Codex。
-
-不要提交 `.env` 文件、生成图片或输出目录。本仓库默认忽略 `.env*` 和 `out/`。
-
-这个 skill 不发送 `size` 参数。API 返回的结果 URL 长期有效，持有链接的人可以访问图片，请按敏感信息处理。
+原名称 [icodeeasy-image-generations](icodeeasy-image-generations/SKILL.md) 提供 Image 2 兼容入口。
 
 ### `icodeeasy-video-generations`
 

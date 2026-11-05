@@ -30,9 +30,9 @@ python3 scripts/generate_image.py generate --prompt "一只橘猫坐在窗台上
 
 常用参数：
 
-- `--resolution`: 默认 `1k`，可选 `1k` 或 `2k`。
-- `--quality`: 默认 `medium`，可选 `low`、`medium`、`high`、`auto`。这个字段只决定计费档，不改变实际输出质量语义。
-- `--n`: 生成张数，按张计费。
+- `--resolution`: 默认 `1k`，可选 `1k`、`2k` 或 `4k`。
+- `--quality`: 默认 `medium`，可选 `low`、`medium`、`high`、`auto`。按实际任务费用结算，画质字段不额外选择价格档。
+- `--n`: 每次请求使用 `1`，多张图片分别提交任务。
 - `--image-url`: 参考图 URL 或 data URL，可重复，URL 必须是 `https://`。
 - `--image-file`: 本地参考图，可重复，脚本会转成 `data:image/*;base64,...` 放进 `image_urls`。
 - `--download-dir`: 下载返回的图片到本地目录。
@@ -88,7 +88,7 @@ python3 scripts/generate_image.py generate \
 - `401`: 检查 `OPENAI_API_KEY` 或 `ANTHROPIC_AUTH_TOKEN`。
 - `402`: 余额或额度不足。
 - `429`: 降低并发或稍后重试。
-- `5xx`: 服务暂时不可用或生成失败，可以稍后重试。
+- `5xx`: 服务暂时不可用。已有任务 ID 时继续查询同一个任务，保留成功结果。
 
 失败请求按接口文档不计费。不要把失败归因写死，除非响应体明确说明原因。
 

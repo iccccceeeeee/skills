@@ -4,36 +4,46 @@ Codex skills for local workflows.
 
 中文版本: [README.md](README.md)
 
-Each skill provides one install command that pulls directly into `~/.codex/skills/`. The install command only depends on common `curl` and `tar` tools.
+Skills install into `~/.codex/skills/`. The commands below use `curl` and `tar`.
 
 ## Skills
 
-### `icodeeasy-image-generations`
+### Image generation
 
-Generate and edit images with the iCodeEasy OpenAI-compatible Images API.
+Choose a standalone skill by version and describe the image you want.
 
-Install into Codex:
+| Skill | Model | Example |
+| --- | --- | --- |
+| [image2](image2/SKILL.md) | Image 2 | `$image2 paint a ginger cat on a windowsill` |
+| [image25](image25/SKILL.md) | Image 2.5 | `$image25 change the reference background to a beach` |
+| [image26](image26/SKILL.md) | Image 2.6 | `$image26 create a coffee cup product photo` |
+
+Each skill includes its own script and instructions and can be installed independently. Image 2.5 and 2.6 default to Flare; ask for Sunburst to use that variant. Skills wait for completion, download the image, and display it. Include a reference image when requesting an edit.
+
+Install or update all three image skills in one command. Existing files are replaced after a successful download and extraction.
 
 ```bash
-if [ -d ~/.codex/skills/icodeeasy-image-generations ]; then echo "icodeeasy-image-generations is already installed"; else mkdir -p ~/.codex/skills && curl -L https://github.com/iccccceeeeee/skills/archive/refs/heads/main.tar.gz | tar -xz -C ~/.codex/skills --strip-components=1 skills-main/icodeeasy-image-generations; fi
+(
+  update_dir=$(mktemp -d) || exit 1
+  trap 'rm -rf "$update_dir"' EXIT
+  curl -fL https://github.com/iccccceeeeee/skills/archive/refs/heads/main.tar.gz -o "$update_dir/skills.tar.gz" &&
+  tar -xzf "$update_dir/skills.tar.gz" -C "$update_dir" skills-main/image2 skills-main/image25 skills-main/image26 &&
+  for skill_name in image2 image25 image26; do
+    mkdir -p "$HOME/.codex/skills/$skill_name" &&
+    cp -R "$update_dir/skills-main/$skill_name/." "$HOME/.codex/skills/$skill_name/" || exit 1
+  done
+)
 ```
 
-Restart Codex after installing or updating the skill.
-
-Configure API access:
+Configure the API key, then invoke the desired skill in a new chat.
 
 ```bash
 export OPENAI_API_KEY="<your-api-key>"
 ```
 
-Use:
+Authentication also supports `ANTHROPIC_AUTH_TOKEN`. Generated images and downloads belong in the project’s `out/images/`. Treat long-lived result URLs as sensitive.
 
-- In Codex, invoke `$icodeeasy-image-generations`, then describe the image to generate or edit.
-- For image edits, provide the reference image path or URL in the same request.
-
-Do not commit `.env` files, generated images, or output directories. This repository ignores `.env*` and `out/` by default.
-
-This skill does not send `size`. Result URLs are long-lived bearer links, so treat them as sensitive.
+The original [icodeeasy-image-generations](icodeeasy-image-generations/SKILL.md) name provides an Image 2 compatibility entry.
 
 ### `icodeeasy-video-generations`
 

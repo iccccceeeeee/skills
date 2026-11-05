@@ -8,6 +8,7 @@ import base64
 import json
 import mimetypes
 import os
+import shlex
 import sys
 import time
 import urllib.error
@@ -19,6 +20,8 @@ from typing import Any
 
 BASE_URL = "https://jp.icodeeasy.cc"
 MODEL = "gpt-image-2"
+MODELS = (MODEL, "gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2.6-flare", "gpt-image-2.6-sunburst")
+ASPECT_RATIOS = ("auto", "1:1", "3:2", "2:3", "16:9", "9:16", "4:3", "3:4", "4:5", "5:4")
 GENERATIONS_PATH = "/v1/images/generations"
 EDITS_PATH = "/v1/images/edits"
 TASK_PATH_PREFIX = "/v1/images/tasks/"
@@ -84,7 +87,10 @@ def request_json(
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             body = response.read().decode("utf-8")
-            return response.status, json.loads(body)
+            parsed = json.loads(body)
+            if not isinstance(parsed, dict):
+                raise UserError("Response JSON must be an object.")
+            return response.status, parsed
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
         try:
@@ -94,6 +100,8 @@ def request_json(
         raise UserError(f"HTTP {exc.code}: {json.dumps(parsed, ensure_ascii=False)}") from None
     except urllib.error.URLError as exc:
         raise UserError(f"Network error: {exc.reason}") from None
+    except (TimeoutError, OSError) as exc:
+        raise UserError(f"Network error: {exc}") from None
     except json.JSONDecodeError as exc:
         raise UserError(f"Response was not valid JSON: {exc}") from None
 
@@ -113,7 +121,10 @@ def download_urls(urls: list[str], output_dir: str | None, timeout: int) -> list
     if not output_dir:
         return []
     directory = Path(output_dir).expanduser()
-    directory.mkdir(parents=True, exist_ok=True)
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise UserError(f"Cannot create download directory: {exc}") from None
     paths: list[str] = []
     for index, url in enumerate(urls, start=1):
         parsed = urllib.parse.urlparse(url)
@@ -128,8 +139,11 @@ def download_urls(urls: list[str], output_dir: str | None, timeout: int) -> list
             url,
             headers={"User-Agent": "Mozilla/5.0 (compatible; Codex image downloader)"},
         )
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            target.write_bytes(response.read())
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                target.write_bytes(response.read())
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            raise UserError(f"Image download failed: {exc}") from None
         paths.append(str(target))
     return paths
 
@@ -140,38 +154,51 @@ def normalize_base_url(base_url: str) -> str:
 
 def image_endpoint_url(base_url: str, path: str, async_mode: bool) -> str:
     url = normalize_base_url(base_url) + path
-    if async_mode:
-        url += "?async=1"
-    return url
+    return url + ("?async=1" if async_mode else "?sync=1")
 
 
 def task_url(base_url: str, task_id: str) -> str:
-    return normalize_base_url(base_url) + TASK_PATH_PREFIX + urllib.parse.quote(task_id)
+    return normalize_base_url(base_url) + TASK_PATH_PREFIX + urllib.parse.quote(task_id, safe="")
+
+
+def redact_secrets(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: redact_secrets(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [redact_secrets(item) for item in value]
+    if isinstance(value, str):
+        for env_name in KEY_ENV_ORDER:
+            secret = os.environ.get(env_name)
+            if secret:
+                value = value.replace(secret, "[REDACTED]")
+    return value
 
 
 def emit(args: argparse.Namespace, result: dict[str, Any]) -> None:
+    result = redact_secrets(result)
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return
 
     if not result.get("ok"):
         print(result.get("summary", "Request failed"), file=sys.stderr)
-        return
-
-    print(result.get("summary", "OK"))
+    else:
+        print(result.get("summary", "OK"))
     for url in result.get("urls", []):
         print(url)
     for path in result.get("downloads", []):
         print(path)
     if result.get("task_id"):
         print(f"task_id: {result['task_id']}")
+    if result.get("resume_command"):
+        print("Resume the same task:", shlex.join(result["resume_command"]))
 
 
 def collect_image_urls(args: argparse.Namespace) -> list[str]:
     image_urls = list(args.image_url or [])
     image_urls.extend(image_file_to_data_url(path) for path in args.image_file or [])
-    if len(image_urls) > 16:
-        raise UserError("image_urls supports at most 16 reference images.")
+    if len(image_urls) > 8:
+        raise UserError("image_urls supports at most 8 reference images.")
     return image_urls
 
 
@@ -179,13 +206,21 @@ def build_payload(args: argparse.Namespace, *, require_reference: bool) -> dict[
     image_urls = collect_image_urls(args)
     if require_reference and not image_urls:
         raise UserError("Edit requests require at least one --image-url or --image-file.")
+    if args.model != "gpt-image-2" and args.n != 1:
+        raise UserError("GPT Image 2.5 and 2.6 support one image per request; use --n 1.")
+    if args.aspect_ratio:
+        ratios = ASPECT_RATIOS + (("21:9",) if args.model.startswith("gpt-image-2.5-") else ())
+        if args.aspect_ratio not in ratios:
+            raise UserError(f"Unsupported aspect ratio for {args.model}.")
     payload: dict[str, Any] = {
-        "model": MODEL,
+        "model": args.model,
         "prompt": args.prompt,
         "n": args.n,
-        "resolution": args.resolution,
-        "quality": args.quality,
+        "image_size": args.resolution.upper(),
+        "quality": args.quality or ("medium" if args.model == "gpt-image-2" else "auto"),
     }
+    if args.aspect_ratio:
+        payload["aspect_ratio"] = args.aspect_ratio
     if image_urls:
         payload["image_urls"] = image_urls
     return payload
@@ -201,7 +236,7 @@ def poll_task(
     interval: float,
     max_wait: float,
 ) -> tuple[int, dict[str, Any]]:
-    deadline = time.time() + max_wait
+    deadline = time.monotonic() + max_wait
     last_status = 0
     last_response: dict[str, Any] = {}
 
@@ -210,114 +245,144 @@ def poll_task(
             "GET", task_url(base_url, task_id), api_key, timeout=timeout
         )
         status_text = last_response.get("status")
-        if not wait or status_text in {"completed", "failed"}:
+        if not wait or status_text not in {"pending", "submitted", "processing", "queued", "running"}:
             return last_status, last_response
-        if time.time() >= deadline:
+        if time.monotonic() >= deadline:
             return last_status, last_response
         time.sleep(interval)
+
+
+def emit_recovery(
+    args: argparse.Namespace,
+    error: UserError,
+    *,
+    stage: str,
+    task_id: str | None,
+    urls: list[str] | None = None,
+    response: dict[str, Any] | None = None,
+) -> int:
+    result: dict[str, Any] = {
+        "ok": False,
+        "summary": f"{stage.capitalize()} failed: {error}",
+        "stage": stage,
+        "task_id": task_id,
+        "urls": urls or [],
+        "response": response or {},
+    }
+    if task_id:
+        result["resume_command"] = [
+            "python3", str(Path(__file__).resolve()), "poll", task_id,
+            "--base-url", args.base_url, "--wait",
+        ]
+        if args.download_dir:
+            result["resume_command"].extend(["--download-dir", args.download_dir])
+    emit(args, result)
+    return 1
+
+
+def emit_response(
+    args: argparse.Namespace,
+    *,
+    http_status: int,
+    response: dict[str, Any],
+    task_id: str | None,
+    key_env: str,
+    waited: bool,
+) -> int:
+    urls = collect_result_urls(response)
+    try:
+        downloads = download_urls(urls, args.download_dir, args.timeout)
+    except UserError as exc:
+        return emit_recovery(args, exc, stage="download", task_id=task_id, urls=urls, response=response)
+    status_text = response.get("status")
+    ok = status_text not in {"failed", "error", "cancelled", "canceled"}
+    ok = ok and (not waited or status_text == "completed") and bool(urls or task_id)
+    if status_text == "completed" and not urls:
+        ok = False
+    summary = f"HTTP {http_status}; key_env={key_env}"
+    model = getattr(args, "model", None)
+    if model:
+        summary += f"; model={model}"
+    if status_text:
+        summary += f"; status={status_text}"
+    if waited and status_text != "completed":
+        summary += "; task did not complete; resume with its task ID"
+    emit(args, {
+        "ok": ok,
+        "summary": summary,
+        "model": model,
+        "http_status": http_status,
+        "key_env": key_env,
+        "task_id": task_id,
+        "urls": urls,
+        "downloads": downloads,
+        "response": response,
+    })
+    return 0 if ok else 1
 
 
 def command_submit(args: argparse.Namespace) -> int:
     path = EDITS_PATH if args.command == "edit" else GENERATIONS_PATH
     payload = build_payload(args, require_reference=args.command == "edit")
-    api_key, key_env = resolve_api_key()
     url = image_endpoint_url(args.base_url, path, args.async_mode)
 
     if args.dry_run:
         safe_payload = dict(payload)
         if "image_urls" in safe_payload:
             safe_payload["image_urls"] = [
-                value if isinstance(value, str) and value.startswith("https://") else "<data-url>"
+                value if value.startswith("https://") else "<data-url>"
                 for value in safe_payload["image_urls"]
             ]
-        emit(
-            args,
-            {
-                "ok": True,
-                "summary": "Dry run only. No network request was sent.",
-                "method": "POST",
-                "url": url,
-                "key_env": key_env,
-                "payload": safe_payload,
-            },
-        )
+        emit(args, {
+            "ok": True,
+            "summary": "Dry run only. No network request was sent.",
+            "method": "POST",
+            "url": url,
+            "payload": safe_payload,
+        })
         return 0
 
+    api_key, key_env = resolve_api_key()
     http_status, response = request_json("POST", url, api_key, payload=payload, timeout=args.timeout)
-    task_id = response.get("task_id") if isinstance(response.get("task_id"), str) else None
+    task_id = response.get("task_id") or response.get("id")
+    if not isinstance(task_id, str):
+        task_id = None
+    if http_status == 202 and not task_id:
+        raise UserError("Task accepted without a task ID. Check account logs before submitting again.")
 
-    waited_for_completion = False
-    if args.async_mode and args.wait and task_id:
-        waited_for_completion = True
-        http_status, response = poll_task(
-            task_id=task_id,
-            api_key=api_key,
-            base_url=args.base_url,
-            timeout=args.timeout,
-            wait=True,
-            interval=args.poll_interval,
-            max_wait=args.max_wait,
-        )
+    waited = bool(task_id and (args.wait or not args.async_mode) and not collect_result_urls(response))
+    if waited:
+        try:
+            http_status, response = poll_task(
+                task_id=task_id,
+                api_key=api_key,
+                base_url=args.base_url,
+                timeout=args.timeout,
+                wait=True,
+                interval=args.poll_interval,
+                max_wait=args.max_wait,
+            )
+        except UserError as exc:
+            return emit_recovery(args, exc, stage="poll", task_id=task_id)
 
-    urls = collect_result_urls(response)
-    downloads = download_urls(urls, args.download_dir, args.timeout)
-    status_text = response.get("status")
-    ok = status_text != "failed" and not (
-        waited_for_completion and status_text != "completed"
-    )
-    summary = f"HTTP {http_status}; endpoint={path}; model={MODEL}; key_env={key_env}"
-    if status_text:
-        summary += f"; status={status_text}"
-    if waited_for_completion and status_text != "completed":
-        summary += "; task did not complete before max wait"
-    emit(
-        args,
-        {
-            "ok": ok,
-            "summary": summary,
-            "http_status": http_status,
-            "key_env": key_env,
-            "task_id": task_id or response.get("task_id"),
-            "urls": urls,
-            "downloads": downloads,
-            "response": response,
-        },
-    )
-    return 0 if ok else 1
+    return emit_response(args, http_status=http_status, response=response, task_id=task_id, key_env=key_env, waited=waited)
 
 
 def command_poll(args: argparse.Namespace) -> int:
     api_key, key_env = resolve_api_key()
-    http_status, response = poll_task(
-        task_id=args.task_id,
-        api_key=api_key,
-        base_url=args.base_url,
-        timeout=args.timeout,
-        wait=args.wait,
-        interval=args.interval,
-        max_wait=args.max_wait,
-    )
-    urls = collect_result_urls(response)
-    downloads = download_urls(urls, args.download_dir, args.timeout)
-    status_text = response.get("status")
-    ok = status_text != "failed" and not (args.wait and status_text != "completed")
-    summary = f"HTTP {http_status}; key_env={key_env}; status={status_text}"
-    if args.wait and status_text != "completed":
-        summary += "; task did not complete before max wait"
-    emit(
-        args,
-        {
-            "ok": ok,
-            "summary": summary,
-            "http_status": http_status,
-            "key_env": key_env,
-            "task_id": args.task_id,
-            "urls": urls,
-            "downloads": downloads,
-            "response": response,
-        },
-    )
-    return 0 if ok else 1
+    try:
+        http_status, response = poll_task(
+            task_id=args.task_id,
+            api_key=api_key,
+            base_url=args.base_url,
+            timeout=args.timeout,
+            wait=args.wait,
+            interval=args.interval,
+            max_wait=args.max_wait,
+        )
+    except UserError as exc:
+        return emit_recovery(args, exc, stage="poll", task_id=args.task_id)
+    return emit_response(args, http_status=http_status, response=response, task_id=args.task_id, key_env=key_env, waited=args.wait)
 
 
 def add_common_network_args(parser: argparse.ArgumentParser) -> None:
@@ -329,9 +394,11 @@ def add_common_network_args(parser: argparse.ArgumentParser) -> None:
 def add_submit_args(parser: argparse.ArgumentParser, *, prompt_help: str) -> None:
     add_common_network_args(parser)
     parser.add_argument("--prompt", required=True, help=prompt_help)
-    parser.add_argument("--n", type=positive_int, default=1, help="number of images")
-    parser.add_argument("--resolution", choices=["1k", "2k"], default="1k")
-    parser.add_argument("--quality", choices=["low", "medium", "high", "auto"], default="medium")
+    parser.add_argument("--model", choices=MODELS, default=MODEL, help="image model")
+    parser.add_argument("--n", type=positive_int, default=1, help="number of images; 2.5 and 2.6 require 1")
+    parser.add_argument("--resolution", choices=["1k", "2k", "4k"], default="1k")
+    parser.add_argument("--quality", choices=["low", "medium", "high", "auto"], help="default: medium for GPT Image 2, auto for 2.5/2.6")
+    parser.add_argument("--aspect-ratio", help="optional image ratio, such as 1:1 or 16:9")
     parser.add_argument(
         "--image-url",
         action="append",

@@ -31,16 +31,16 @@ Required:
 
 Optional:
 
-- `n`: image count, default `1`.
-- `resolution`: `1k` or `2k`, default `1k`.
-- `quality`: `low`, `medium`, `high`, or `auto`, default billing is `medium`.
-- `image_urls`: up to 16 reference images. Each item must be an `https://` URL or a `data:image/...;base64,...` data URL.
+- `n`: use `1` per task; submit separate tasks for multiple images.
+- `image_size`: `1K`, `2K`, or `4K`, default `1K`. The script’s `--resolution` option sets this field.
+- `quality`: `low`, `medium`, `high`, or `auto`, the default setting is `medium`.
+- `image_urls`: up to 8 reference images. Each item must be an `https://` URL or a `data:image/...;base64,...` data URL.
 
-`quality` controls billing tier, not image quality semantics. Billing is per image: low ¥0.10, medium/auto ¥0.20, high ¥0.40.
+Billing follows the actual completed task charge. Quality does not select an additional price tier for Image 2.
 
 ## Sync and async
 
-Default sync response, HTTP 200:
+Explicit synchronous requests use `?sync=1` and return HTTP 200. The script also handles an asynchronous task response by polling the same task.
 
 ```json
 {

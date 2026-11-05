@@ -1,0 +1,4 @@
+interface:
+  display_name: "Image 2.6"
+  short_description: "Generate and edit images with Image 2.6 via iCodeEasy"
+  default_prompt: "Use $image26 to generate or edit the requested image and show the result."
