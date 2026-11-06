@@ -30,7 +30,7 @@ python3 scripts/generate_image.py generate --prompt "一只橘猫坐在窗台上
 
 常用参数：
 
-- `--resolution`: 默认 `1k`，可选 `1k`、`2k` 或 `4k`。
+- `--resolution`: 默认 `1k`。Image 2 和 2.5 可选 `1k`、`2k` 或 `4k`，Image 2.6 仅支持 `1k`。
 - `--quality`: 默认 `medium`，可选 `low`、`medium`、`high`、`auto`。按实际任务费用结算，画质字段不额外选择价格档。
 - `--n`: 每次请求使用 `1`，多张图片分别提交任务。
 - `--image-url`: 参考图 URL 或 data URL，可重复，URL 必须是 `https://`。

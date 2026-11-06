@@ -10,8 +10,8 @@ description: Use when the user asks to generate animated GIFs, looping animation
 ## 默认行为
 
 - 默认使用 `gpt-image-2.6-flare`。用户明确指定 Sunburst 时使用 `gpt-image-2.6-sunburst`。
-- 每个任务生成一段 GIF，默认 9 帧、每帧 200 ms，单帧默认 512×512。
-- 用户没有指定参数时直接使用默认值。明确时长或尺寸要求按 [API 参考](references/api.md) 选择帧数、帧间隔和单帧尺寸。
+- 每个任务生成一段 GIF，按成功结果收费，每段 ¥0.0833。
+- 帧数、帧间隔和尺寸由模型决定。用户要求固定时长或尺寸时，说明输出参数为自动设置。
 - 用户要多段动画时，逐段提交独立任务。
 - 当前支持文字生成 GIF。用户要求使用参考图制作动画时，说明这一限制，并保留其参考图要求。
 - 默认等待完成，将 GIF 下载到用户项目的 `out/images/`，以本地绝对路径展示动画，保留原始 GIF 字节。
@@ -37,7 +37,6 @@ python3 scripts/generate_image.py generate \
 - 成功后展示本地 `.gif` 文件的绝对路径，并简短说明使用了 Image 2.6 GIF。
 - 保存任务 ID。轮询超时、网络中断或下载失败时，继续查询和下载同一个任务。
 - 用 `poll <task_id> --wait --download-dir ./out/images --json` 恢复结果。已创建的任务不应因等待或下载失败而重复提交。
-- 费用按完整任务的实际用量结算。
 - 结果链接长期有效，按持有链接即可访问的敏感信息处理。仅在用户需要时提供完整链接。
 
 参数边界、模型变体和恢复命令见 [API 参考](references/api.md)。

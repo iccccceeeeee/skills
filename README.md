@@ -19,7 +19,9 @@ Skills 安装到 `~/.codex/skills/`。下面的安装命令使用 `curl` 和 `ta
 | [image26-icodeeasy](image26-icodeeasy/SKILL.md) | Image 2.6 静态图片 | `$image26-icodeeasy 生成一张咖啡杯产品图` |
 | [image26-gif-icodeeasy](image26-gif-icodeeasy/SKILL.md) | Image 2.6 GIF | `$image26-gif-icodeeasy 生成一盏轻轻摇晃的灯笼 GIF` |
 
-每个 skill 包含独立脚本和说明，可单独安装。Image 2.5、2.6 默认使用 Flare，指定 Sunburst 时会切换对应模型。生成后会等待完成、下载并展示图片；静态图片编辑时附上参考图即可。`image26-gif-icodeeasy` 独立提供文生 GIF，默认 9 帧、每帧 200 ms。
+每个 skill 包含独立脚本和说明，可单独安装。Image 2.5、2.6 默认使用 Flare，指定 Sunburst 时会切换对应模型。生成后会等待完成、下载并展示图片。静态图片编辑时附上参考图即可。
+
+Image 2.6 静态图片仅支持 1K。GIF 仅支持文字生成，帧数、帧间隔和尺寸由模型决定。Flare 和 Sunburst 均按成功结果收费，每张 PNG 或每段 GIF ¥0.0833。
 
 一次安装或更新四个图片与 GIF skill，下载和解包成功后才覆盖已有文件。
 

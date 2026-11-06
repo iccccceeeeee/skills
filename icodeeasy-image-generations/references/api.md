@@ -26,17 +26,17 @@ The local script reads the key from `OPENAI_API_KEY`, then `ANTHROPIC_AUTH_TOKEN
 
 Required:
 
-- `model`: currently `gpt-image-2`.
+- `model`: defaults to `gpt-image-2`. The script also accepts the `gpt-image-2.5-flare`, `gpt-image-2.5-sunburst`, `gpt-image-2.6-flare`, and `gpt-image-2.6-sunburst` static image variants.
 - `prompt`: image prompt, Chinese or English.
 
 Optional:
 
 - `n`: use `1` per task; submit separate tasks for multiple images.
-- `image_size`: `1K`, `2K`, or `4K`, default `1K`. The script’s `--resolution` option sets this field.
-- `quality`: `low`, `medium`, `high`, or `auto`, the default setting is `medium`.
+- `image_size`: `1K`, `2K`, or `4K` for Image 2 and 2.5. Image 2.6 supports `1K` only. The script’s `--resolution` option sets this field and defaults to `1K`.
+- `quality`: `low`, `medium`, `high`, or `auto`. Defaults to `medium` for Image 2 and `auto` for Image 2.5 and 2.6.
 - `image_urls`: up to 8 reference images. Each item must be an `https://` URL or a `data:image/...;base64,...` data URL.
 
-Billing follows the actual completed task charge. Quality does not select an additional price tier for Image 2.
+Billing follows the actual completed task charge. Quality does not select an additional price tier for Image 2. Image 2.6 costs ¥0.0833 per successful result.
 
 ## Sync and async
 

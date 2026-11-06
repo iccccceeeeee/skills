@@ -34,8 +34,8 @@ class GifSkillTests(unittest.TestCase):
     def test_gif_defaults_match_the_verified_provider_contract(self):
         payload = self.payload()
         self.assertEqual(payload["output_format"], "gif")
-        self.assertEqual(payload["frame_count"], 9)
-        self.assertEqual(payload["frame_duration_ms"], 200)
+        self.assertNotIn("frame_count", payload)
+        self.assertNotIn("frame_duration_ms", payload)
         self.assertEqual(payload["size"], "auto")
         self.assertEqual(payload["n"], 1)
         self.assertEqual(payload["model"], "gpt-image-2.6-flare")
@@ -43,21 +43,18 @@ class GifSkillTests(unittest.TestCase):
         self.assertNotIn("image_size", payload)
         self.assertNotIn("resolution", payload)
 
-    def test_custom_gif_frames_and_size_are_forwarded(self):
-        payload = self.payload("--frame-count", "4",
-                               "--frame-duration-ms", "300", "--frame-size", "768x432")
-        self.assertEqual(payload["frame_count"], 4)
-        self.assertEqual(payload["frame_duration_ms"], 300)
-        self.assertEqual(payload["size"], "768x432")
+    def test_legacy_gif_defaults_are_accepted_without_forwarding(self):
+        for size in ("auto", "512x512"):
+            with self.subTest(size=size):
+                self.assertEqual(self.payload("--frame-count", "9", "--frame-duration-ms", "200",
+                                              "--frame-size", size), self.payload())
 
     def test_unsupported_gif_inputs_fail_before_submission(self):
         invalid = [
             ("--n", "2"),
-            ("--frame-count", "1"), ("--frame-count", "17"),
-            ("--frame-duration-ms", "10"), ("--frame-duration-ms", "205"),
-            ("--frame-size", "1024x1024"), ("--frame-size", "513x512"),
-            ("--frame-size", f"{16 * 10**400}x512"),
-            ("--frame-size", "16:9"),
+            ("--frame-count", "4"),
+            ("--frame-duration-ms", "300"),
+            ("--frame-size", "768x432"),
         ]
         for options in invalid:
             with self.subTest(options=options), self.assertRaises(image.UserError):

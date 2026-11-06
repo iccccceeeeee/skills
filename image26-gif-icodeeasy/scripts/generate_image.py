@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import shlex
 import sys
 import time
@@ -179,44 +178,17 @@ def emit(args: argparse.Namespace, result: dict[str, Any]) -> None:
 def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     if args.n != 1:
         raise UserError("Generate one GIF per task.")
-    frames = args.frame_count if args.frame_count is not None else 9
-    duration = args.frame_duration_ms if args.frame_duration_ms is not None else 200
-    if frames < 2 or frames > 16:
-        raise UserError("GIF frame count must be between 2 and 16.")
-    if duration < 20 or duration % 10:
-        raise UserError("GIF frame duration must be at least 20 ms in 10 ms steps.")
-    size = (args.frame_size or "auto").lower()
-    width, height = 512, 512
-    if size != "auto":
-        match = re.fullmatch(r"([1-9][0-9]*)x([1-9][0-9]*)", size)
-        if match is None:
-            raise UserError("GIF frame size must be auto or WIDTHxHEIGHT.")
-        width, height = (int(value) for value in match.groups())
-    if width % 16 or height % 16:
-        raise UserError("GIF frame dimensions must be multiples of 16.")
-    if max(width, height) > 3840:
-        raise UserError("GIF frame dimensions exceed the animation canvas limits.")
-    columns, rows = (4, 2)
-    if frames == 9:
-        columns, rows = (3, 3)
-    elif frames >= 13:
-        columns, rows = (4, 4)
-    elif frames >= 10:
-        columns, rows = (4, 3)
-    layouts = ((width * columns, height * rows), (width * rows, height * columns))
-    sheet_width, sheet_height = min(layouts, key=lambda dimensions: max(dimensions) / min(dimensions))
-    if (max(sheet_width, sheet_height) > 3840
-            or sheet_width * sheet_height > 8_294_400
-            or max(sheet_width, sheet_height) > 3 * min(sheet_width, sheet_height)):
-        raise UserError("GIF frame size and count exceed the animation canvas limits.")
+    # Accept old defaults so existing commands still work without setting frame options.
+    if (args.frame_count not in (None, 9)
+            or args.frame_duration_ms not in (None, 200)
+            or args.frame_size not in (None, "auto", "512x512")):
+        raise UserError("GIF frame count, duration, and dimensions are automatic. Remove the frame options.")
     return {
         "model": args.model,
         "prompt": args.prompt,
         "n": 1,
         "output_format": "gif",
-        "frame_count": frames,
-        "frame_duration_ms": duration,
-        "size": size,
+        "size": "auto",
         "quality": args.quality or "auto",
     }
 
@@ -385,9 +357,9 @@ def add_submit_args(parser: argparse.ArgumentParser, *, prompt_help: str) -> Non
     parser.add_argument("--prompt", required=True, help=prompt_help)
     parser.add_argument("--model", choices=MODELS, default=MODEL, help="GIF model")
     parser.add_argument("--n", type=positive_int, default=1, help="number of GIFs; must be 1")
-    parser.add_argument("--frame-count", type=int, help="GIF frames, 2 to 16; default 9")
-    parser.add_argument("--frame-duration-ms", type=int, help="GIF frame duration; default 200 ms")
-    parser.add_argument("--frame-size", help="GIF frame dimensions, such as 512x512; default auto")
+    parser.add_argument("--frame-count", type=int, help=argparse.SUPPRESS)
+    parser.add_argument("--frame-duration-ms", type=int, help=argparse.SUPPRESS)
+    parser.add_argument("--frame-size", type=str.lower, help=argparse.SUPPRESS)
     parser.add_argument("--quality", choices=["low", "medium", "high", "auto"], help="GIF quality; default auto")
     parser.add_argument("--async", dest="async_mode", action="store_true", help="submit async task")
     parser.add_argument("--wait", action="store_true", help="wait for async task completion")
@@ -400,7 +372,7 @@ def add_submit_args(parser: argparse.ArgumentParser, *, prompt_help: str) -> Non
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Generate animated GIFs with Image 2.6 through iCodeEasy."
+        description="Generate animated GIFs from text with Image 2.6 through iCodeEasy. Frame timing and dimensions are automatic."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 

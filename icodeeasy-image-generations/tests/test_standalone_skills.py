@@ -41,6 +41,16 @@ class StandaloneSkillTests(unittest.TestCase):
                 ], capture_output=True, text=True)
                 self.assertNotEqual(result.returncode, 0)
 
+    def test_static_image26_rejects_higher_resolutions_before_submission(self):
+        script = ROOT / "image26-icodeeasy/scripts/generate_image.py"
+        for resolution in ("2k", "4k"):
+            with self.subTest(resolution=resolution):
+                result = subprocess.run([
+                    sys.executable, str(script), "generate", "--prompt", "A lantern",
+                    "--resolution", resolution, "--dry-run", "--json",
+                ], capture_output=True, text=True, env={})
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("1k", result.stderr)
 
     def test_image2_accepts_the_requested_landscape_ratio(self):
         result = subprocess.run(

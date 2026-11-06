@@ -206,19 +206,17 @@ def build_payload(args: argparse.Namespace, *, require_reference: bool) -> dict[
     image_urls = collect_image_urls(args)
     if require_reference and not image_urls:
         raise UserError("Edit requests require at least one --image-url or --image-file.")
-    if args.model != "gpt-image-2" and args.n != 1:
-        raise UserError("GPT Image 2.5 and 2.6 support one image per request; use --n 1.")
-    if args.aspect_ratio:
-        ratios = ASPECT_RATIOS + (("21:9",) if args.model.startswith("gpt-image-2.5-") else ())
-        if args.aspect_ratio not in ratios:
-            raise UserError(f"Unsupported aspect ratio for {args.model}.")
+    if args.n != 1:
+        raise UserError("GPT Image 2.6 supports one image per request. Use --n 1.")
+    if args.aspect_ratio and args.aspect_ratio not in ASPECT_RATIOS:
+        raise UserError(f"Unsupported aspect ratio for {args.model}.")
     payload: dict[str, Any] = {
         "model": args.model,
         "prompt": args.prompt,
         "n": args.n,
-        "image_size": (args.resolution or "1k").upper(),
+        "image_size": args.resolution.upper(),
         "output_format": "png",
-        "quality": args.quality or ("medium" if args.model == "gpt-image-2" else "auto"),
+        "quality": args.quality or "auto",
     }
     if args.aspect_ratio:
         payload["aspect_ratio"] = args.aspect_ratio
@@ -396,9 +394,9 @@ def add_submit_args(parser: argparse.ArgumentParser, *, prompt_help: str) -> Non
     add_common_network_args(parser)
     parser.add_argument("--prompt", required=True, help=prompt_help)
     parser.add_argument("--model", choices=MODELS, default=MODEL, help="image model")
-    parser.add_argument("--n", type=positive_int, default=1, help="number of images; 2.5 and 2.6 require 1")
-    parser.add_argument("--resolution", choices=["1k", "2k", "4k"], default="1k", help="PNG resolution; default 1k")
-    parser.add_argument("--quality", choices=["low", "medium", "high", "auto"], help="default: medium for GPT Image 2, auto for 2.5/2.6")
+    parser.add_argument("--n", type=positive_int, default=1, help="number of images; must be 1")
+    parser.add_argument("--resolution", choices=["1k"], default="1k", help="PNG resolution; only 1k is supported")
+    parser.add_argument("--quality", choices=["low", "medium", "high", "auto"], help="PNG quality; default auto")
     parser.add_argument("--aspect-ratio", help="optional image ratio, such as 1:1 or 16:9")
     parser.add_argument(
         "--image-url",

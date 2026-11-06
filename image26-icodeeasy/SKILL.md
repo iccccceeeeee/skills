@@ -10,8 +10,8 @@ description: Use when the user asks to generate or edit images with Image 2.6, G
 ## 默认行为
 
 - 默认模型为 `gpt-image-2.6-flare`。用户明确指定 Sunburst 时使用 `gpt-image-2.6-sunburst`。
-- 默认生成一张 PNG，使用 `1k` 分辨率和 `auto` 画质设置。
-- 用户没有指定参数时直接使用默认值。用户指定尺寸、比例或张数时，按 [API 参考](references/api.md) 选择参数。
+- 每个任务生成一张 PNG。分辨率仅支持 `1k`，画质默认为 `auto`。按成功结果收费，每张 ¥0.0833。
+- 用户指定比例时，按 [API 参考](references/api.md) 选择参数。用户要求 `2k` 或 `4k` 时，说明 1K 限制。
 - 用户要多张图片时，逐张提交独立任务，每个任务设置 `n=1`。
 - 用户要求修改已有图片时，使用 `edit` 并附上参考图。参考图可以来自当前对话、本地文件或 HTTPS 链接。
 - 默认等待任务完成，将图片下载到用户项目的 `out/images/`，然后以绝对路径展示图片。

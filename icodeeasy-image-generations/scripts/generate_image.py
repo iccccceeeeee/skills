@@ -203,6 +203,8 @@ def collect_image_urls(args: argparse.Namespace) -> list[str]:
 
 
 def build_payload(args: argparse.Namespace, *, require_reference: bool) -> dict[str, Any]:
+    if args.model.startswith("gpt-image-2.6-") and args.resolution != "1k":
+        raise UserError("GPT Image 2.6 supports only 1k resolution. Use --resolution 1k.")
     image_urls = collect_image_urls(args)
     if require_reference and not image_urls:
         raise UserError("Edit requests require at least one --image-url or --image-file.")
@@ -396,7 +398,7 @@ def add_submit_args(parser: argparse.ArgumentParser, *, prompt_help: str) -> Non
     parser.add_argument("--prompt", required=True, help=prompt_help)
     parser.add_argument("--model", choices=MODELS, default=MODEL, help="image model")
     parser.add_argument("--n", type=positive_int, default=1, help="number of images; 2.5 and 2.6 require 1")
-    parser.add_argument("--resolution", choices=["1k", "2k", "4k"], default="1k")
+    parser.add_argument("--resolution", choices=["1k", "2k", "4k"], default="1k", help="image resolution; 2.6 supports only 1k")
     parser.add_argument("--quality", choices=["low", "medium", "high", "auto"], help="default: medium for GPT Image 2, auto for 2.5/2.6")
     parser.add_argument("--aspect-ratio", help="optional image ratio, such as 1:1 or 16:9")
     parser.add_argument(

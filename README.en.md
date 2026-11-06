@@ -19,7 +19,9 @@ Choose a standalone skill for static images or GIFs and describe the result you 
 | [image26-icodeeasy](image26-icodeeasy/SKILL.md) | Image 2.6 static images | `$image26-icodeeasy create a coffee cup product photo` |
 | [image26-gif-icodeeasy](image26-gif-icodeeasy/SKILL.md) | Image 2.6 GIF | `$image26-gif-icodeeasy create a looping GIF of a swaying lantern` |
 
-Each skill includes its own script and instructions and can be installed independently. Image 2.5 and 2.6 default to Flare; ask for Sunburst to use that variant. Skills wait for completion, download the image, and display it. Include a reference image when requesting a static edit. `image26-gif-icodeeasy` independently generates animated GIFs from text, with nine frames at 200 ms per frame by default.
+Each skill includes its own script and instructions and can be installed independently. Image 2.5 and 2.6 default to Flare. Ask for Sunburst to use that variant. Skills wait for completion, download the image, and display it. Include a reference image when requesting a static edit.
+
+Image 2.6 static images are available at 1K. GIFs are generated from text, with frame count, timing, and dimensions set by the model. Both Flare and Sunburst cost ¥0.0833 per successful PNG or GIF.
 
 Install or update all four image and GIF skills in one command. Existing files are replaced after a successful download and extraction.
 

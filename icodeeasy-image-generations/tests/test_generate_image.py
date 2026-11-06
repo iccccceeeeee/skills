@@ -75,11 +75,23 @@ class ImageCLITests(unittest.TestCase):
     def test_model_selection_resolution_and_quality_defaults(self):
         for model in ("gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2.6-flare", "gpt-image-2.6-sunburst"):
             with self.subTest(model=model):
-                payload = image.build_payload(self.parse("--model", model, "--resolution", "4k"), require_reference=False)
+                resolution = "1k" if model.startswith("gpt-image-2.6-") else "4k"
+                payload = image.build_payload(self.parse("--model", model, "--resolution", resolution), require_reference=False)
                 self.assertEqual(payload["model"], model)
-                self.assertEqual(payload["image_size"], "4K")
+                self.assertEqual(payload["image_size"], resolution.upper())
                 self.assertNotIn("size", payload)
                 self.assertEqual(payload["quality"], "medium" if model == "gpt-image-2" else "auto")
+
+    def test_image26_rejects_higher_resolutions_before_submission(self):
+        with FakeAPI([]) as api:
+            for model in ("gpt-image-2.6-flare", "gpt-image-2.6-sunburst"):
+                for resolution in ("2k", "4k"):
+                    with self.subTest(model=model, resolution=resolution):
+                        code, result = self.invoke(api, "generate", "--prompt", "A cup",
+                                                   "--model", model, "--resolution", resolution)
+                        self.assertEqual(code, 1)
+                        self.assertIn("1k", result["summary"])
+            self.assertEqual(api.requests, [])
 
     def test_bare_and_ext_models_are_rejected(self):
         for model in ("gpt-image-2.6", "gpt-image-2.6-ext"):
