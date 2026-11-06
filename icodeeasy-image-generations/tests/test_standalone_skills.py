@@ -41,16 +41,20 @@ class StandaloneSkillTests(unittest.TestCase):
                 ], capture_output=True, text=True)
                 self.assertNotEqual(result.returncode, 0)
 
-    def test_static_image26_rejects_higher_resolutions_before_submission(self):
+    def test_static_image26_higher_resolutions_are_sent_as_image_size(self):
         script = ROOT / "image26-icodeeasy/scripts/generate_image.py"
-        for resolution in ("2k", "4k"):
-            with self.subTest(resolution=resolution):
-                result = subprocess.run([
-                    sys.executable, str(script), "generate", "--prompt", "A lantern",
-                    "--resolution", resolution, "--dry-run", "--json",
-                ], capture_output=True, text=True, env={})
-                self.assertEqual(result.returncode, 2)
-                self.assertIn("1k", result.stderr)
+        for model in ("gpt-image-2.6-flare", "gpt-image-2.6-sunburst"):
+            for resolution in ("2k", "4k"):
+                with self.subTest(model=model, resolution=resolution):
+                    result = subprocess.run([
+                        sys.executable, str(script), "generate", "--prompt", "A lantern",
+                        "--model", model, "--resolution", resolution, "--dry-run", "--json",
+                    ], capture_output=True, text=True, env={})
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    payload = json.loads(result.stdout)["payload"]
+                    self.assertEqual(payload["model"], model)
+                    self.assertEqual(payload["image_size"], resolution.upper())
+                    self.assertEqual(payload["output_format"], "png")
 
     def test_image2_accepts_the_requested_landscape_ratio(self):
         result = subprocess.run(

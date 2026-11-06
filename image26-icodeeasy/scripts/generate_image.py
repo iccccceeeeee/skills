@@ -395,7 +395,7 @@ def add_submit_args(parser: argparse.ArgumentParser, *, prompt_help: str) -> Non
     parser.add_argument("--prompt", required=True, help=prompt_help)
     parser.add_argument("--model", choices=MODELS, default=MODEL, help="image model")
     parser.add_argument("--n", type=positive_int, default=1, help="number of images; must be 1")
-    parser.add_argument("--resolution", choices=["1k"], default="1k", help="PNG resolution; only 1k is supported")
+    parser.add_argument("--resolution", choices=["1k", "2k", "4k"], default="1k", help="PNG resolution; default 1k")
     parser.add_argument("--quality", choices=["low", "medium", "high", "auto"], help="PNG quality; default auto")
     parser.add_argument("--aspect-ratio", help="optional image ratio, such as 1:1 or 16:9")
     parser.add_argument(

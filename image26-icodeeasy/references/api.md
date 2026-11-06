@@ -4,13 +4,13 @@
 
 ## 参数
 
-每个任务生成一张 PNG，参考图最多八张。分辨率仅支持 `1k`，背景使用 `auto`。实际像素以返回图片为准。
+每个任务生成一张 PNG，参考图最多八张。分辨率可选 `1k`、`2k` 或 `4k`，背景使用 `auto`。实际像素以返回图片为准。
 
-画质可选 `auto`、`low`、`medium`、`high`，默认 `auto`。按成功结果收费，每张 ¥0.0833。
+画质可选 `auto`、`low`、`medium`、`high`，默认 `auto`。1K 每张成功结果 ¥0.0833。2K、4K 按实际用量结算。
 
 支持的比例为 `auto`、`1:1`、`3:2`、`2:3`、`16:9`、`9:16`、`4:3`、`3:4`、`4:5`、`5:4`。
 
-脚本发送 `image_size: "1K"`，`--resolution 1k` 可以省略。需要明确比例时使用 `--aspect-ratio`，脚本发送 `aspect_ratio`。
+用 `--resolution` 选择分辨率，脚本发送 `image_size`，默认为 `"1K"`。需要明确比例时使用 `--aspect-ratio`，脚本发送 `aspect_ratio`。
 
 参考图使用 `--image-file` 或 `--image-url`，都可以重复。脚本将本地文件编码后放入 `image_urls`。
 
