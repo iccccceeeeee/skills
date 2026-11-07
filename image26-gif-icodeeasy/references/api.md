@@ -4,15 +4,18 @@
 
 ## 参数
 
-`generate` 每次从文本创建一段 GIF。脚本发送 `output_format: "gif"`、`size: "auto"` 和 `n: 1`，画质默认为 `auto`。帧数、帧间隔和尺寸由模型决定。
+`generate` 每次创建一段 GIF，支持纯文本或文本加参考图。脚本发送 `output_format: "gif"`、`size: "auto"` 和 `n: 1`，画质默认为 `auto`。帧数、帧间隔和尺寸由模型决定。
+
+参考图可用 `--image-file` 指定本地文件，也可用 `--image-url` 传 HTTPS 链接或 `data:image/...;base64,...`。两种参数均可重复，总计最多八张。脚本将参考图放入 `image_urls`，本地文件会转换为 data URL。服务根据有无参考图选择生成方式。
 
 ```bash
 python3 scripts/generate_image.py generate \
   --prompt "一盏纸灯笼随风轻摆，无缝循环" \
+  --image-file ./lantern.png \
   --async --wait --download-dir ./out/images --json
 ```
 
-按成功结果收费，每段 ¥0.0833。下载时保留原始 GIF 字节。
+纯文生 GIF 标准价为每个成功结果 ¥0.0833。Flare 文生 GIF 触发备用通道时每个成功结果 ¥0.30。参考图生成 GIF 按实际用量结算。下载时保留原始 GIF 字节。
 
 ## 接口
 

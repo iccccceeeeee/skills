@@ -1,4 +1,4 @@
 interface:
   display_name: "Image 2.6 GIF iCodeEasy"
-  short_description: "Generate animated GIFs with Image 2.6 via iCodeEasy"
-  default_prompt: "Use $image26-gif-icodeeasy to generate the requested animated GIF and show the result."
+  short_description: "Generate Image 2.6 GIFs from text or reference images"
+  default_prompt: "Use $image26-gif-icodeeasy to generate the requested animated GIF, using any reference images I provide, and show the result."

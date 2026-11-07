@@ -1,5 +1,6 @@
 """GIF-specific request and recovery behavior for the Image 2.6 skill."""
 
+import base64
 import contextlib
 import importlib.util
 import io
@@ -42,6 +43,7 @@ class GifSkillTests(unittest.TestCase):
         self.assertEqual(self.payload("--model", "gpt-image-2.6-sunburst")["model"], "gpt-image-2.6-sunburst")
         self.assertNotIn("image_size", payload)
         self.assertNotIn("resolution", payload)
+        self.assertNotIn("image_urls", payload)
 
     def test_legacy_gif_defaults_are_accepted_without_forwarding(self):
         for size in ("auto", "512x512"):
@@ -60,30 +62,52 @@ class GifSkillTests(unittest.TestCase):
             with self.subTest(options=options), self.assertRaises(image.UserError):
                 self.payload(*options)
 
-    def test_static_and_reference_options_are_rejected_before_submission(self):
+    def test_static_options_and_insecure_references_are_rejected_before_submission(self):
         for options in (("--format", "png"), ("--resolution", "2k"),
-                        ("--aspect-ratio", "16:9"), ("--image-file", "/missing.png"),
-                        ("--image-url", "https://example.test/ref.png")):
+                        ("--aspect-ratio", "16:9"), ("--image-url", "http://example.test/ref.png")):
             with self.subTest(options=options), contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-                image.main(["generate", "--prompt", "A lantern", *options])
+                image.main(["generate", "--prompt", "A lantern", "--dry-run", *options])
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-            image.main(["edit", "--prompt", "Animate a lantern"])
+            image.main(["edit", "--prompt", "Animate a lantern", "--dry-run"])
+
+    def test_reference_limit_counts_urls_and_files_together(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ref = Path(directory) / "ref.png"
+            ref.write_bytes(b"test image")
+            options = ["--image-url", "https://example.test/ref.png"] * 7
+            options += ["--image-file", str(ref)]
+            self.assertEqual(len(self.payload(*options)["image_urls"]), 8)
+            with self.assertRaisesRegex(image.UserError, "at most 8"):
+                self.payload(*options, "--image-file", str(ref))
+            with self.assertRaisesRegex(image.UserError, "not found"):
+                self.payload("--image-file", str(Path(directory) / "missing.png"))
 
     def test_gif_skill_runs_with_only_its_own_installed_directory(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "image26-gif-icodeeasy"
             shutil.copytree(SCRIPT.parents[1], target)
+            ref = Path(directory) / "ref.png"
+            ref.write_bytes(b"test image")
             result = subprocess.run([
                 sys.executable, str(target / "scripts/generate_image.py"),
-                "generate", "--prompt", "A lantern", "--dry-run", "--json",
+                "generate", "--prompt", "A lantern",
+                "--image-url", "https://example.test/ref.png",
+                "--image-url", "data:image/png;base64,aW1hZ2U=",
+                "--image-file", str(ref), "--dry-run", "--json",
             ], cwd=directory, capture_output=True, text=True, check=True,
                env={key: value for key, value in os.environ.items()
                     if key not in ("OPENAI_API_KEY", "ANTHROPIC_AUTH_TOKEN", "PYTHONPATH")})
-        self.assertEqual(json.loads(result.stdout)["payload"]["output_format"], "gif")
+        payload = json.loads(result.stdout)["payload"]
+        self.assertEqual(payload["output_format"], "gif")
+        self.assertEqual(payload["image_urls"], ["https://example.test/ref.png", "<data-url>", "<data-url>"])
 
     def test_gif_result_keeps_its_file_extension_and_uses_one_task(self):
         gif_bytes = b"GIF89a" + bytes.fromhex("01000100800000000000ffffff3b")
         with tempfile.TemporaryDirectory() as directory:
+            first_ref = Path(directory) / "first.png"
+            second_ref = Path(directory) / "second.jpg"
+            first_ref.write_bytes(b"first image")
+            second_ref.write_bytes(b"second image")
             with FakeAPI([
                 (202, {"status": "pending", "task_id": "gif-task"}),
                 (200, {"status": "submitted", "task_id": "gif-task"}),
@@ -95,6 +119,9 @@ class GifSkillTests(unittest.TestCase):
                 with patch.dict(os.environ, {"OPENAI_API_KEY": "gif-test-key"}, clear=True), contextlib.redirect_stdout(output):
                     code = image.main([
                         "generate", "--prompt", "A swaying lantern",
+                        "--image-url", "https://example.test/first.png",
+                        "--image-url", "https://example.test/second.png",
+                        "--image-file", str(first_ref), "--image-file", str(second_ref),
                         "--async", "--wait", "--poll-interval", "0", "--base-url", api.base_url,
                         "--download-dir", directory, "--json",
                     ])
@@ -105,7 +132,15 @@ class GifSkillTests(unittest.TestCase):
             self.assertEqual(saved.read_bytes(), gif_bytes)
             self.assertEqual(result["task_id"], "gif-task")
             self.assertEqual([request[0] for request in api.requests], ["POST", "GET", "GET", "GET"])
-            self.assertEqual(api.requests[0][2]["output_format"], "gif")
+            _, endpoint, payload = api.requests[0]
+            self.assertEqual(endpoint, "/v1/images/generations?async=1")
+            self.assertEqual(payload["output_format"], "gif")
+            self.assertEqual(payload["size"], "auto")
+            self.assertEqual(payload["image_urls"], [
+                "https://example.test/first.png", "https://example.test/second.png",
+                "data:image/png;base64," + base64.b64encode(b"first image").decode("ascii"),
+                "data:image/jpeg;base64," + base64.b64encode(b"second image").decode("ascii"),
+            ])
 
     def test_download_failure_can_resume_the_same_gif_task(self):
         gif_bytes = b"GIF89a" + bytes.fromhex("01000100800000000000ffffff3b")

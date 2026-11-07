@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
+import mimetypes
 import os
 import shlex
 import sys
@@ -37,6 +39,16 @@ def resolve_api_key() -> tuple[str, str]:
     raise UserError(f"Missing API key. Set {joined}.")
 
 
+def validate_ref(value: str) -> str:
+    if value.startswith("https://"):
+        return value
+    if value.startswith("data:image/") and ";base64," in value:
+        return value
+    raise argparse.ArgumentTypeError(
+        "reference images must be https:// URLs or data:image/...;base64,... values"
+    )
+
+
 def positive_int(value: str) -> int:
     try:
         parsed = int(value)
@@ -45,6 +57,18 @@ def positive_int(value: str) -> int:
     if parsed < 1:
         raise argparse.ArgumentTypeError("must be at least 1")
     return parsed
+
+
+def image_file_to_data_url(path_text: str) -> str:
+    path = Path(path_text).expanduser()
+    if not path.is_file():
+        raise UserError(f"Reference image file not found: {path}")
+    mime_type = mimetypes.guess_type(path.name)[0] or "image/png"
+    try:
+        data = base64.b64encode(path.read_bytes()).decode("ascii")
+    except OSError as exc:
+        raise UserError(f"Cannot read reference image: {exc}") from None
+    return f"data:{mime_type};base64,{data}"
 
 
 def request_json(
@@ -183,7 +207,13 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             or args.frame_duration_ms not in (None, 200)
             or args.frame_size not in (None, "auto", "512x512")):
         raise UserError("GIF frame count, duration, and dimensions are automatic. Remove the frame options.")
-    return {
+    image_urls = list(args.image_url or [])
+    image_files = args.image_file or []
+    if len(image_urls) + len(image_files) > 8:
+        raise UserError("image_urls supports at most 8 reference images.")
+    image_urls.extend(image_file_to_data_url(path) for path in image_files)
+
+    payload: dict[str, Any] = {
         "model": args.model,
         "prompt": args.prompt,
         "n": 1,
@@ -191,6 +221,9 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         "size": "auto",
         "quality": args.quality or "auto",
     }
+    if image_urls:
+        payload["image_urls"] = image_urls
+    return payload
 
 
 def poll_task(
@@ -294,6 +327,11 @@ def command_submit(args: argparse.Namespace) -> int:
 
     if args.dry_run:
         safe_payload = dict(payload)
+        if "image_urls" in safe_payload:
+            safe_payload["image_urls"] = [
+                value if value.startswith("https://") else "<data-url>"
+                for value in safe_payload["image_urls"]
+            ]
         emit(args, {
             "ok": True,
             "summary": "Dry run only. No network request was sent.",
@@ -361,6 +399,17 @@ def add_submit_args(parser: argparse.ArgumentParser, *, prompt_help: str) -> Non
     parser.add_argument("--frame-duration-ms", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--frame-size", type=str.lower, help=argparse.SUPPRESS)
     parser.add_argument("--quality", choices=["low", "medium", "high", "auto"], help="GIF quality; default auto")
+    parser.add_argument(
+        "--image-url",
+        action="append",
+        type=validate_ref,
+        help="reference image as https:// URL or data:image data URL; repeatable",
+    )
+    parser.add_argument(
+        "--image-file",
+        action="append",
+        help="local reference image file encoded into image_urls; repeatable",
+    )
     parser.add_argument("--async", dest="async_mode", action="store_true", help="submit async task")
     parser.add_argument("--wait", action="store_true", help="wait for async task completion")
     parser.add_argument("--poll-interval", type=float, default=5.0, help="async poll interval seconds")
@@ -372,7 +421,10 @@ def add_submit_args(parser: argparse.ArgumentParser, *, prompt_help: str) -> Non
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Generate animated GIFs from text with Image 2.6 through iCodeEasy. Frame timing and dimensions are automatic."
+        description=(
+            "Generate animated GIFs from text with optional reference images through iCodeEasy. "
+            "Frame timing and dimensions are automatic."
+        )
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 

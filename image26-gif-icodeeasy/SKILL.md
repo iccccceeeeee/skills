@@ -1,6 +1,6 @@
 ---
 name: image26-gif-icodeeasy
-description: Use when the user asks to generate animated GIFs, looping animations, or $image26-gif-icodeeasy with Image 2.6 through iCodeEasy. Generates GIFs from text, waits for completion, and delivers local animation files.
+description: Use when the user asks to generate animated GIFs, looping animations, or $image26-gif-icodeeasy with Image 2.6 through iCodeEasy. Generates GIFs from text with optional reference images, waits for completion, and delivers local animation files.
 ---
 
 # Image 2.6 GIF
@@ -10,10 +10,10 @@ description: Use when the user asks to generate animated GIFs, looping animation
 ## 默认行为
 
 - 默认使用 `gpt-image-2.6-flare`。用户明确指定 Sunburst 时使用 `gpt-image-2.6-sunburst`。
-- 每个任务生成一段 GIF，按成功结果收费，每段 ¥0.0833。
+- 每个任务生成一段 GIF。纯文生 GIF 标准价为每个成功结果 ¥0.0833，参考图生成 GIF 按实际用量结算。
 - 帧数、帧间隔和尺寸由模型决定。用户要求固定时长或尺寸时，说明输出参数为自动设置。
 - 用户要多段动画时，逐段提交独立任务。
-- 当前支持文字生成 GIF。用户要求使用参考图制作动画时，说明这一限制，并保留其参考图要求。
+- 用户要把已有图片做成动图时，用 `generate` 加上 `--image-file` 或 `--image-url`。两种参数均可重复，总计最多八张。
 - 默认等待完成，将 GIF 下载到用户项目的 `out/images/`，以本地绝对路径展示动画，保留原始 GIF 字节。
 
 静态图片生成和编辑入口为独立的 `$image26-icodeeasy`。
