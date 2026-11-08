@@ -34,9 +34,9 @@ Optional:
 - `n`: use `1` per task; submit separate tasks for multiple images.
 - `image_size`: `1K`, `2K`, or `4K`. The script’s `--resolution` option sets this field and defaults to `1K`.
 - `quality`: `low`, `medium`, `high`, or `auto`. Defaults to `medium` for Image 2 and `auto` for Image 2.5 and 2.6.
-- `image_urls`: up to 8 reference images. Each item must be an `https://` URL or a `data:image/...;base64,...` data URL.
+- `image_urls`: up to 8 reference images. Each item must be an `https://` URL or a `data:image/...;base64,...` data URL. Image 2.6 accepts PNG, JPEG, or WebP references at 2K and 4K.
 
-Billing follows the actual completed task charge. Quality does not select an additional price tier for Image 2. Image 2.6 costs ¥0.0833 per successful 1K result. Its 2K and 4K results are billed by actual usage.
+Billing follows the actual completed task charge. Quality does not select an additional price tier for Image 2. Both Image 2.6 variants cost ¥0.0833 per successful 1K result, ¥0.294 per 2K result, and ¥0.392 per 4K result.
 
 ## Sync and async
 

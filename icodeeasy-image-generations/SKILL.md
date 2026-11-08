@@ -30,11 +30,12 @@ python3 scripts/generate_image.py generate --prompt "一只橘猫坐在窗台上
 
 常用参数：
 
-- `--resolution`: 默认 `1k`，可选 `1k`、`2k` 或 `4k`。Image 2.6 的 1K 每张成功结果 ¥0.0833，2K、4K 按实际用量结算。
+- `--resolution`: 默认 `1k`，可选 `1k`、`2k` 或 `4k`。Image 2.6 按成功结果收费，1K 每张 ¥0.0833，2K 每张 ¥0.294，4K 每张 ¥0.392。
 - `--quality`: 默认 `medium`，可选 `low`、`medium`、`high`、`auto`。按实际任务费用结算，画质字段不额外选择价格档。
 - `--n`: 每次请求使用 `1`，多张图片分别提交任务。
 - `--image-url`: 参考图 URL 或 data URL，可重复，URL 必须是 `https://`。
 - `--image-file`: 本地参考图，可重复，脚本会转成 `data:image/*;base64,...` 放进 `image_urls`。
+- Image 2.6 的 2K 和 4K 参考图使用 PNG、JPEG 或 WebP。
 - `--download-dir`: 下载返回的图片到本地目录。
 - `--json`: 输出机器可读结果。
 

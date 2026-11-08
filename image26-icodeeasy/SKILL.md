@@ -11,10 +11,10 @@ description: Use when the user asks to generate or edit images with Image 2.6, G
 
 - 默认模型为 `gpt-image-2.6-flare`。用户明确指定 Sunburst 时使用 `gpt-image-2.6-sunburst`。
 - 每个任务生成一张 PNG。分辨率可选 `1k`、`2k` 或 `4k`，默认 `1k`，画质默认为 `auto`。
-- 1K 每张成功结果 ¥0.0833。2K、4K 按实际用量结算。
+- Flare 和 Sunburst 均按成功结果收费。1K 每张 ¥0.0833，2K 每张 ¥0.294，4K 每张 ¥0.392。
 - 用户指定分辨率或比例时，按 [API 参考](references/api.md) 选择参数。
 - 用户要多张图片时，逐张提交独立任务，每个任务设置 `n=1`。
-- 用户要求修改已有图片时，使用 `edit` 并附上参考图。参考图可以来自当前对话、本地文件或 HTTPS 链接。
+- 用户要求修改已有图片时，使用 `edit` 并附上参考图。参考图可以来自当前对话、本地文件或 HTTPS 链接。2K 和 4K 的参考图使用 PNG、JPEG 或 WebP。
 - 默认等待任务完成，将图片下载到用户项目的 `out/images/`，然后以绝对路径展示图片。
 
 GIF 动图入口为独立的 `$image26-gif-icodeeasy`。

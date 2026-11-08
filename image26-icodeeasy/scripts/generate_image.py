@@ -204,6 +204,13 @@ def collect_image_urls(args: argparse.Namespace) -> list[str]:
 
 def build_payload(args: argparse.Namespace, *, require_reference: bool) -> dict[str, Any]:
     image_urls = collect_image_urls(args)
+    if args.resolution in ("2k", "4k") and any(
+        url.startswith("data:") and url.partition(";")[0].lower() not in (
+            "data:image/png", "data:image/jpeg", "data:image/jpg", "data:image/webp"
+        )
+        for url in image_urls
+    ):
+        raise UserError("Use PNG, JPEG, or WebP reference images at 2K or 4K.")
     if require_reference and not image_urls:
         raise UserError("Edit requests require at least one --image-url or --image-file.")
     if args.n != 1:

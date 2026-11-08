@@ -21,7 +21,9 @@ Choose a standalone skill for static images or GIFs and describe the result you 
 
 Each skill includes its own script and instructions and can be installed independently. Image 2.5 and 2.6 default to Flare. Ask for Sunburst to use that variant. Skills wait for completion, download the image, and display it. Include a reference image when requesting a static edit.
 
-Image 2.6 static images are available at 1K, 2K, and 4K. GIFs support text prompts with optional reference images. The model sets frame count, timing, and dimensions. For both Flare and Sunburst, the standard price for each successful 1K PNG or text-only GIF is ¥0.0833. Billing for 2K and 4K PNGs and GIFs with reference images is based on actual usage.
+For both Image 2.6 variants, each successful PNG costs ¥0.0833 at 1K, ¥0.294 at 2K, or ¥0.392 at 4K. Use PNG, JPEG, or WebP reference images at 2K and 4K.
+
+GIFs support text prompts with optional reference images. The model sets frame count, timing, and dimensions. The standard price for a successful text-only GIF is ¥0.0833. GIFs generated with reference images are billed by actual usage.
 
 Install or update all four image and GIF skills in one command. Existing files are replaced after a successful download and extraction.
 

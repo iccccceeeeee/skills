@@ -56,6 +56,31 @@ class StandaloneSkillTests(unittest.TestCase):
                     self.assertEqual(payload["image_size"], resolution.upper())
                     self.assertEqual(payload["output_format"], "png")
 
+    def test_static_image26_high_res_checks_known_reference_formats(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bmp = Path(directory) / "reference.bmp"
+            bmp.write_bytes(b"BM")
+            for skill in ("image26-icodeeasy", "icodeeasy-image-generations"):
+                script = ROOT / skill / "scripts/generate_image.py"
+                for resolution, options, supported in (
+                    ("2k", ["--image-file", str(bmp)], False),
+                    ("4k", ["--image-url", "data:image/gif;base64,R0lG"], False),
+                    ("4k", ["--image-url", "data:image/webp;base64,UklG"], True),
+                    ("1k", ["--image-file", str(bmp)], True),
+                ):
+                    with self.subTest(skill=skill, resolution=resolution, options=options):
+                        result = subprocess.run([
+                            sys.executable, str(script), "edit", "--prompt", "A lantern",
+                            "--model", "gpt-image-2.6-sunburst", "--resolution", resolution,
+                            "--dry-run", "--json", *options,
+                        ], capture_output=True, text=True, env={})
+                        self.assertEqual(result.returncode, 0 if supported else 1, result.stdout + result.stderr)
+                        response = json.loads(result.stdout)
+                        if supported:
+                            self.assertEqual(response["payload"]["image_urls"], ["<data-url>"])
+                        else:
+                            self.assertIn("PNG, JPEG, or WebP", response["summary"])
+
     def test_image2_accepts_the_requested_landscape_ratio(self):
         result = subprocess.run(
             [sys.executable, str(ROOT / "image2-icodeeasy/scripts/generate_image.py"),
