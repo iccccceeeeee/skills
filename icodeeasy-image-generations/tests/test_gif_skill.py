@@ -16,7 +16,9 @@ from unittest.mock import patch
 
 from test_generate_image import FakeAPI
 
-SCRIPT = Path(__file__).resolve().parents[2] / "image26-gif-icodeeasy/scripts/generate_image.py"
+ROOT = Path(__file__).resolve().parents[2]
+SCRIPT_PATH = Path("icodeeasy-image-generations/scripts/generate_image26_gif.py")
+SCRIPT = ROOT / SCRIPT_PATH
 spec = importlib.util.spec_from_file_location("image26_gif", SCRIPT)
 image = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(image)
@@ -82,24 +84,34 @@ class GifSkillTests(unittest.TestCase):
             with self.assertRaisesRegex(image.UserError, "not found"):
                 self.payload("--image-file", str(Path(directory) / "missing.png"))
 
-    def test_gif_skill_runs_with_only_its_own_installed_directory(self):
-        with tempfile.TemporaryDirectory() as directory:
-            target = Path(directory) / "image26-gif-icodeeasy"
-            shutil.copytree(SCRIPT.parents[1], target)
-            ref = Path(directory) / "ref.png"
-            ref.write_bytes(b"test image")
-            result = subprocess.run([
-                sys.executable, str(target / "scripts/generate_image.py"),
-                "generate", "--prompt", "A lantern",
-                "--image-url", "https://example.test/ref.png",
-                "--image-url", "data:image/png;base64,aW1hZ2U=",
-                "--image-file", str(ref), "--dry-run", "--json",
-            ], cwd=directory, capture_output=True, text=True, check=True,
-               env={key: value for key, value in os.environ.items()
-                    if key not in ("OPENAI_API_KEY", "ANTHROPIC_AUTH_TOKEN", "PYTHONPATH")})
-        payload = json.loads(result.stdout)["payload"]
-        self.assertEqual(payload["output_format"], "gif")
-        self.assertEqual(payload["image_urls"], ["https://example.test/ref.png", "<data-url>", "<data-url>"])
+    def test_each_gif_skill_runs_from_its_installed_entry_and_runner(self):
+        for variant in ("flare", "sunburst"):
+            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as directory:
+                installed = Path(directory)
+                name = f"image26-gif-{variant}-icodeeasy"
+                target = installed / name
+                shutil.copytree(ROOT / name, target)
+                model = f"gpt-image-2.6-{variant}"
+                skill = (target / "SKILL.md").read_text(encoding="utf-8")
+                self.assertIn(f"(../{SCRIPT_PATH.as_posix()})", skill)
+                self.assertIn(f"--model {model}", skill)
+                runner = installed / SCRIPT_PATH
+                runner.parent.mkdir(parents=True)
+                shutil.copy2(SCRIPT, runner)
+                ref = installed / "ref.png"
+                ref.write_bytes(b"test image")
+                result = subprocess.run([
+                    sys.executable, str(runner), "generate", "--model", model, "--prompt", "A lantern",
+                    "--image-url", "https://example.test/ref.png",
+                    "--image-url", "data:image/png;base64,aW1hZ2U=",
+                    "--image-file", str(ref), "--dry-run", "--json",
+                ], cwd=directory, capture_output=True, text=True, check=True,
+                   env={key: value for key, value in os.environ.items()
+                        if key not in ("OPENAI_API_KEY", "ANTHROPIC_AUTH_TOKEN", "PYTHONPATH")})
+                payload = json.loads(result.stdout)["payload"]
+                self.assertEqual(payload["model"], model)
+                self.assertEqual(payload["output_format"], "gif")
+                self.assertEqual(payload["image_urls"], ["https://example.test/ref.png", "<data-url>", "<data-url>"])
 
     def test_gif_result_keeps_its_file_extension_and_uses_one_task(self):
         gif_bytes = b"GIF89a" + bytes.fromhex("01000100800000000000ffffff3b")
@@ -161,7 +173,7 @@ class GifSkillTests(unittest.TestCase):
             self.assertEqual(code, 1)
             self.assertEqual(failure["task_id"], "recover-gif")
             self.assertIn("poll", failure["resume_command"])
-            self.assertIn("image26-gif-icodeeasy", " ".join(failure["resume_command"]))
+            self.assertEqual(Path(failure["resume_command"][1]), SCRIPT)
             recovered = io.StringIO()
             with contextlib.redirect_stdout(recovered):
                 code = image.main(["poll", "recover-gif", "--wait", *common])

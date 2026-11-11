@@ -1,4 +1,0 @@
-interface:
-  display_name: "Image 2.6 iCodeEasy"
-  short_description: "Generate and edit static images with Image 2.6"
-  default_prompt: "Use $image26-icodeeasy to generate or edit the requested static image and show the result."

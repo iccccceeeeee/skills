@@ -7,12 +7,12 @@ description: Use when generating animated GIFs with Image 2.6 Sunburst (gpt-imag
 
 此入口固定使用 `gpt-image-2.6-sunburst`。提交请求时显式传入下列 `--model`。
 
-使用 `generate` 创建 GIF，可用 `--image-file` 或 `--image-url` 添加参考图。帧数、帧间隔和尺寸自动设置。详见 [API 参考](../image26-gif-icodeeasy/references/api.md)。
+使用 `generate` 创建 GIF，可用 `--image-file` 或 `--image-url` 添加参考图。帧数、帧间隔和尺寸自动设置。详见 [API 参考](../icodeeasy-image-generations/references/image26-gif.md)。
 
-使用 [生成脚本](../image26-gif-icodeeasy/scripts/generate_image.py)，将示例中的脚本路径替换为实际绝对路径，在用户的项目目录执行。
+使用 [生成脚本](../icodeeasy-image-generations/scripts/generate_image26_gif.py)，将示例中的脚本路径替换为实际绝对路径，在用户的项目目录执行。
 
 ```bash
-python3 /absolute/path/to/image26-gif-icodeeasy/scripts/generate_image.py generate \
+python3 /absolute/path/to/icodeeasy-image-generations/scripts/generate_image26_gif.py generate \
   --model gpt-image-2.6-sunburst --prompt "纸灯笼在夜风中轻轻摇晃，无缝循环" \
   --async --wait --download-dir ./out/images --json
 ```

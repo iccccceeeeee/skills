@@ -1,4 +1,0 @@
-interface:
-  display_name: "Image 2.5 iCodeEasy"
-  short_description: "Generate and edit images with Image 2.5 via iCodeEasy"
-  default_prompt: "Use $image25-icodeeasy to generate or edit the requested image and show the result."

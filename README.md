@@ -18,12 +18,12 @@ Skills 安装到 `~/.codex/skills/`。下面的安装命令使用 `curl` 和 `ta
 | Image 2.5 静态图片 | [Flare](image25-flare-icodeeasy/SKILL.md) · [Sunburst](image25-sunburst-icodeeasy/SKILL.md) |
 | Image 2.6 静态图片 | [Flare](image26-flare-icodeeasy/SKILL.md) · [Sunburst](image26-sunburst-icodeeasy/SKILL.md) |
 | Image 2.6 GIF | [Flare](image26-gif-flare-icodeeasy/SKILL.md) · [Sunburst](image26-gif-sunburst-icodeeasy/SKILL.md) |
-| Seedream 5.5、5 Flash、5 Pro、5.0 Lite、4.5、4.0 | [各型号入口](seedream-icodeeasy/SKILL.md) |
-| FLUX 2 Pro、Max、Flex、FLUX 3 Image、Image Klein | [各型号入口](flux-icodeeasy/SKILL.md) |
+| Seedream 5 | [5.5](seedream-5-5-icodeeasy/SKILL.md) · [5 Flash](seedream-5-0-flash-icodeeasy/SKILL.md) · [5 Pro](seedream-5-0-pro-icodeeasy/SKILL.md) · [5.0 Lite](seedream-5-0-lite-icodeeasy/SKILL.md) |
+| Seedream 4 | [4.5](seedream-4-5-icodeeasy/SKILL.md) · [4.0](seedream-4-0-icodeeasy/SKILL.md) |
+| FLUX 2 | [Pro](flux-2-pro-icodeeasy/SKILL.md) · [Max](flux-2-max-icodeeasy/SKILL.md) · [Flex](flux-2-flex-icodeeasy/SKILL.md) |
+| FLUX 3 | [Image](flux-3-image-icodeeasy/SKILL.md) · [Image Klein](flux-3-image-klein-icodeeasy/SKILL.md) |
 
 例如，使用 `$image26-sunburst-icodeeasy 生成一张咖啡杯产品图` 或 `$image26-gif-flare-icodeeasy 生成一盏轻轻摇晃的灯笼 GIF`。生成后会等待完成、下载并展示图片。静态图片编辑时附上参考图即可。
-
-原有的 [Image 2.5](image25-icodeeasy/SKILL.md)、[Image 2.6](image26-icodeeasy/SKILL.md) 和 [Image 2.6 GIF](image26-gif-icodeeasy/SKILL.md) 入口继续可用，未指定变体时默认使用 Flare。
 
 Image 2.6 静态图片按成功结果收费。Flare 和 Sunburst 的 1K PNG 每张 ¥0.0833，2K 每张 ¥0.294，4K 每张 ¥0.392。2K 和 4K 的参考图使用 PNG、JPEG 或 WebP。
 
@@ -48,6 +48,8 @@ GIF 可以纯文生，也可以附参考图，帧数、帧间隔和尺寸由模�
 )
 ```
 
+旧版安装更新后，可删除 `~/.codex/skills/` 下 `image25-icodeeasy`、`image26-icodeeasy`、`image26-gif-icodeeasy`、`seedream-icodeeasy` 和 `flux-icodeeasy` 各目录中的 `SKILL.md`。目录里的其他文件可保留。重启 Codex 后，旧入口会从技能列表消失。
+
 配置 API Key 后，在新聊天中直接调用对应 skill。
 
 ```bash
@@ -56,7 +58,7 @@ export OPENAI_API_KEY="<your-api-key>"
 
 认证也兼容 `ANTHROPIC_AUTH_TOKEN`。图片与下载输出放在项目的 `out/images/`。图片结果链接长期有效，按敏感信息处理。
 
-[icodeeasy-image-generations](icodeeasy-image-generations/SKILL.md) 是通用生图入口，未指定模型时使用 Image 2。
+[icodeeasy-image-generations](icodeeasy-image-generations/SKILL.md) 是通用生图入口，未指定模型时使用 Image 2。指定 Image 2.5 或 2.6 而未指定变体时，默认使用对应版本的 Flare。
 
 ### `icodeeasy-video-generations`
 

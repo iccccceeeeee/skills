@@ -23,7 +23,12 @@ description: Use when explicitly invoking $icodeeasy-image-generations, using th
 | Image 2.6 静态图 | [$image26-flare-icodeeasy](../image26-flare-icodeeasy/SKILL.md) | [$image26-sunburst-icodeeasy](../image26-sunburst-icodeeasy/SKILL.md) |
 | Image 2.6 GIF | [$image26-gif-flare-icodeeasy](../image26-gif-flare-icodeeasy/SKILL.md) | [$image26-gif-sunburst-icodeeasy](../image26-gif-sunburst-icodeeasy/SKILL.md) |
 
-各子型号的独立入口见 [Seedream 系列](../seedream-icodeeasy/SKILL.md)和 [FLUX 系列](../flux-icodeeasy/SKILL.md)。
+| 系列 | 各型号的独立入口 |
+| --- | --- |
+| Seedream 5 | [5.5](../seedream-5-5-icodeeasy/SKILL.md) · [5 Flash](../seedream-5-0-flash-icodeeasy/SKILL.md) · [5 Pro](../seedream-5-0-pro-icodeeasy/SKILL.md) · [5.0 Lite](../seedream-5-0-lite-icodeeasy/SKILL.md) |
+| Seedream 4 | [4.5](../seedream-4-5-icodeeasy/SKILL.md) · [4.0](../seedream-4-0-icodeeasy/SKILL.md) |
+| FLUX 2 | [Pro](../flux-2-pro-icodeeasy/SKILL.md) · [Max](../flux-2-max-icodeeasy/SKILL.md) · [Flex](../flux-2-flex-icodeeasy/SKILL.md) |
+| FLUX 3 | [Image](../flux-3-image-icodeeasy/SKILL.md) · [Image Klein](../flux-3-image-klein-icodeeasy/SKILL.md) |
 
 文生图用 `generate`。用 `--image-file` 或 `--image-url` 添加参考图，可重复。每个任务生成一张；需要多张时逐张提交。尺寸、比例、参考图上限按[对应模型的 API 参考](references/api.md)选择。
 

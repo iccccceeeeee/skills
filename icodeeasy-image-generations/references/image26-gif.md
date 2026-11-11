@@ -9,7 +9,7 @@
 参考图可用 `--image-file` 指定本地文件，也可用 `--image-url` 传 HTTPS 链接或 `data:image/...;base64,...`。两种参数均可重复，总计最多八张。脚本将参考图放入 `image_urls`，本地文件会转换为 data URL。服务根据有无参考图选择生成方式。
 
 ```bash
-python3 scripts/generate_image.py generate \
+python3 scripts/generate_image26_gif.py generate \
   --prompt "一盏纸灯笼随风轻摆，无缝循环" \
   --image-file ./lantern.png \
   --async --wait --download-dir ./out/images --json
@@ -29,7 +29,7 @@ python3 scripts/generate_image.py generate \
 ## 恢复结果
 
 ```bash
-python3 scripts/generate_image.py poll <task_id> \
+python3 scripts/generate_image26_gif.py poll <task_id> \
   --wait --download-dir ./out/images --json
 ```
 
@@ -38,7 +38,7 @@ python3 scripts/generate_image.py poll <task_id> \
 ## 离线检查
 
 ```bash
-python3 scripts/generate_image.py generate \
+python3 scripts/generate_image26_gif.py generate \
   --prompt "一盏纸灯笼轻轻摇摆，无缝循环" --dry-run --json
 ```
 

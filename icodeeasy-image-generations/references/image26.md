@@ -27,7 +27,7 @@
 ## 恢复结果
 
 ```bash
-python3 scripts/generate_image.py poll <task_id> \
+python3 scripts/generate_image26.py poll <task_id> \
   --wait --download-dir ./out/images --json
 ```
 
@@ -36,7 +36,7 @@ python3 scripts/generate_image.py poll <task_id> \
 ## 离线检查
 
 ```bash
-python3 scripts/generate_image.py generate \
+python3 scripts/generate_image26.py generate \
   --prompt "浅色木桌上的陶瓷咖啡杯" --dry-run --json
 ```
 

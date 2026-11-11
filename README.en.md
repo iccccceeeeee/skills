@@ -18,12 +18,12 @@ Choose a skill by model and output format, then describe the result you want.
 | Image 2.5 static images | [Flare](image25-flare-icodeeasy/SKILL.md) · [Sunburst](image25-sunburst-icodeeasy/SKILL.md) |
 | Image 2.6 static images | [Flare](image26-flare-icodeeasy/SKILL.md) · [Sunburst](image26-sunburst-icodeeasy/SKILL.md) |
 | Image 2.6 GIF | [Flare](image26-gif-flare-icodeeasy/SKILL.md) · [Sunburst](image26-gif-sunburst-icodeeasy/SKILL.md) |
-| Seedream 5.5, 5 Flash, 5 Pro, 5.0 Lite, 4.5, 4.0 | [Model skills](seedream-icodeeasy/SKILL.md) |
-| FLUX 2 Pro, Max, Flex, FLUX 3 Image, Image Klein | [Model skills](flux-icodeeasy/SKILL.md) |
+| Seedream 5 | [5.5](seedream-5-5-icodeeasy/SKILL.md) · [5 Flash](seedream-5-0-flash-icodeeasy/SKILL.md) · [5 Pro](seedream-5-0-pro-icodeeasy/SKILL.md) · [5.0 Lite](seedream-5-0-lite-icodeeasy/SKILL.md) |
+| Seedream 4 | [4.5](seedream-4-5-icodeeasy/SKILL.md) · [4.0](seedream-4-0-icodeeasy/SKILL.md) |
+| FLUX 2 | [Pro](flux-2-pro-icodeeasy/SKILL.md) · [Max](flux-2-max-icodeeasy/SKILL.md) · [Flex](flux-2-flex-icodeeasy/SKILL.md) |
+| FLUX 3 | [Image](flux-3-image-icodeeasy/SKILL.md) · [Image Klein](flux-3-image-klein-icodeeasy/SKILL.md) |
 
 Try `$image26-sunburst-icodeeasy create a coffee cup product photo` or `$image26-gif-flare-icodeeasy create a looping GIF of a swaying lantern`. The skills wait for completion, download the result, and display it. Include a reference image when requesting a static edit.
-
-The original [Image 2.5](image25-icodeeasy/SKILL.md), [Image 2.6](image26-icodeeasy/SKILL.md), and [Image 2.6 GIF](image26-gif-icodeeasy/SKILL.md) skills default to Flare when you leave the variant unspecified.
 
 For both Image 2.6 variants, each successful PNG costs ¥0.0833 at 1K, ¥0.294 at 2K, or ¥0.392 at 4K. Use PNG, JPEG, or WebP reference images at 2K and 4K.
 
@@ -48,6 +48,8 @@ Install or update all image and GIF skills and their shared scripts. The command
 )
 ```
 
+After updating an older installation, you can remove just the `SKILL.md` files from `image25-icodeeasy`, `image26-icodeeasy`, `image26-gif-icodeeasy`, `seedream-icodeeasy`, and `flux-icodeeasy` under `~/.codex/skills/`. You can keep any other files in those directories. Restart Codex to refresh the skill list.
+
 Configure the API key, then invoke the desired skill in a new chat.
 
 ```bash
@@ -56,7 +58,7 @@ export OPENAI_API_KEY="<your-api-key>"
 
 Authentication also supports `ANTHROPIC_AUTH_TOKEN`. Generated images and downloads belong in the project’s `out/images/`. Treat long-lived result URLs as sensitive.
 
-The general [icodeeasy-image-generations](icodeeasy-image-generations/SKILL.md) skill defaults to Image 2 when you leave the model unspecified.
+The general [icodeeasy-image-generations](icodeeasy-image-generations/SKILL.md) skill defaults to Image 2 when you leave the model unspecified. If you ask for Image 2.5 or 2.6 without naming a variant, it uses Flare for that version.
 
 ### `icodeeasy-video-generations`
 
