@@ -10,32 +10,40 @@ Skills install into `~/.codex/skills/`. The commands below use `curl` and `tar`.
 
 ### Image generation
 
-Choose a standalone skill for static images or GIFs and describe the result you want.
+Choose a skill by model and output format, then describe the result you want.
 
-| Skill | Model | Example |
-| --- | --- | --- |
-| [image2-icodeeasy](image2-icodeeasy/SKILL.md) | Image 2 | `$image2-icodeeasy paint a ginger cat on a windowsill` |
-| [image25-icodeeasy](image25-icodeeasy/SKILL.md) | Image 2.5 | `$image25-icodeeasy change the reference background to a beach` |
-| [image26-icodeeasy](image26-icodeeasy/SKILL.md) | Image 2.6 static images | `$image26-icodeeasy create a coffee cup product photo` |
-| [image26-gif-icodeeasy](image26-gif-icodeeasy/SKILL.md) | Image 2.6 GIF | `$image26-gif-icodeeasy create a looping GIF of a swaying lantern` |
+| Model and output | Skill |
+| --- | --- |
+| Image 2 | [image2-icodeeasy](image2-icodeeasy/SKILL.md) |
+| Image 2.5 static images | [Flare](image25-flare-icodeeasy/SKILL.md) · [Sunburst](image25-sunburst-icodeeasy/SKILL.md) |
+| Image 2.6 static images | [Flare](image26-flare-icodeeasy/SKILL.md) · [Sunburst](image26-sunburst-icodeeasy/SKILL.md) |
+| Image 2.6 GIF | [Flare](image26-gif-flare-icodeeasy/SKILL.md) · [Sunburst](image26-gif-sunburst-icodeeasy/SKILL.md) |
+| Seedream 5.5, 5 Flash, 5 Pro, 5.0 Lite, 4.5, 4.0 | [Model skills](seedream-icodeeasy/SKILL.md) |
+| FLUX 2 Pro, Max, Flex, FLUX 3 Image, Image Klein | [Model skills](flux-icodeeasy/SKILL.md) |
 
-Each skill includes its own script and instructions and can be installed independently. Image 2.5 and 2.6 default to Flare. Ask for Sunburst to use that variant. Skills wait for completion, download the image, and display it. Include a reference image when requesting a static edit.
+Try `$image26-sunburst-icodeeasy create a coffee cup product photo` or `$image26-gif-flare-icodeeasy create a looping GIF of a swaying lantern`. The skills wait for completion, download the result, and display it. Include a reference image when requesting a static edit.
+
+The original [Image 2.5](image25-icodeeasy/SKILL.md), [Image 2.6](image26-icodeeasy/SKILL.md), and [Image 2.6 GIF](image26-gif-icodeeasy/SKILL.md) skills default to Flare when you leave the variant unspecified.
 
 For both Image 2.6 variants, each successful PNG costs ¥0.0833 at 1K, ¥0.294 at 2K, or ¥0.392 at 4K. Use PNG, JPEG, or WebP reference images at 2K and 4K.
 
 GIFs support text prompts with optional reference images. The model sets frame count, timing, and dimensions. The standard price for a successful text-only GIF is ¥0.0833. GIFs generated with reference images are billed by actual usage.
 
-Install or update all four image and GIF skills in one command. Existing files are replaced after a successful download and extraction.
+Install or update all image and GIF skills and their shared scripts. The command replaces existing files after a successful download and extraction.
 
 ```bash
 (
   update_dir=$(mktemp -d) || exit 1
   trap 'rm -rf "$update_dir"' EXIT
   curl -fL https://github.com/iccccceeeeee/skills/archive/refs/heads/main.tar.gz -o "$update_dir/skills.tar.gz" &&
-  tar -xzf "$update_dir/skills.tar.gz" -C "$update_dir" skills-main/image2-icodeeasy skills-main/image25-icodeeasy skills-main/image26-icodeeasy skills-main/image26-gif-icodeeasy &&
-  for skill_name in image2-icodeeasy image25-icodeeasy image26-icodeeasy image26-gif-icodeeasy; do
+  tar -xzf "$update_dir/skills.tar.gz" -C "$update_dir" &&
+  for skill_dir in "$update_dir"/skills-main/icodeeasy-image-generations \
+                   "$update_dir"/skills-main/image*-icodeeasy \
+                   "$update_dir"/skills-main/seedream*-icodeeasy \
+                   "$update_dir"/skills-main/flux*-icodeeasy; do
+    skill_name=${skill_dir##*/}
     mkdir -p "$HOME/.codex/skills/$skill_name" &&
-    cp -R "$update_dir/skills-main/$skill_name/." "$HOME/.codex/skills/$skill_name/" || exit 1
+    cp -R "$skill_dir/." "$HOME/.codex/skills/$skill_name/" || exit 1
   done
 )
 ```
@@ -48,7 +56,7 @@ export OPENAI_API_KEY="<your-api-key>"
 
 Authentication also supports `ANTHROPIC_AUTH_TOKEN`. Generated images and downloads belong in the project’s `out/images/`. Treat long-lived result URLs as sensitive.
 
-The original [icodeeasy-image-generations](icodeeasy-image-generations/SKILL.md) name provides an Image 2 compatibility entry.
+The general [icodeeasy-image-generations](icodeeasy-image-generations/SKILL.md) skill defaults to Image 2 when you leave the model unspecified.
 
 ### `icodeeasy-video-generations`
 

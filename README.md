@@ -10,32 +10,40 @@ Skills 安装到 `~/.codex/skills/`。下面的安装命令使用 `curl` 和 `ta
 
 ### 图片生成
 
-选择静态图片或 GIF 的独立 skill，直接描述想要的画面。
+按模型和输出格式选择 skill，直接描述想要的画面。
 
-| Skill | 模型 | 调用示例 |
-| --- | --- | --- |
-| [image2-icodeeasy](image2-icodeeasy/SKILL.md) | Image 2 | `$image2-icodeeasy 画一只窗台上的橘猫` |
-| [image25-icodeeasy](image25-icodeeasy/SKILL.md) | Image 2.5 | `$image25-icodeeasy 把参考图背景改成海边` |
-| [image26-icodeeasy](image26-icodeeasy/SKILL.md) | Image 2.6 静态图片 | `$image26-icodeeasy 生成一张咖啡杯产品图` |
-| [image26-gif-icodeeasy](image26-gif-icodeeasy/SKILL.md) | Image 2.6 GIF | `$image26-gif-icodeeasy 生成一盏轻轻摇晃的灯笼 GIF` |
+| 模型与输出 | Skill |
+| --- | --- |
+| Image 2 | [image2-icodeeasy](image2-icodeeasy/SKILL.md) |
+| Image 2.5 静态图片 | [Flare](image25-flare-icodeeasy/SKILL.md) · [Sunburst](image25-sunburst-icodeeasy/SKILL.md) |
+| Image 2.6 静态图片 | [Flare](image26-flare-icodeeasy/SKILL.md) · [Sunburst](image26-sunburst-icodeeasy/SKILL.md) |
+| Image 2.6 GIF | [Flare](image26-gif-flare-icodeeasy/SKILL.md) · [Sunburst](image26-gif-sunburst-icodeeasy/SKILL.md) |
+| Seedream 5.5、5 Flash、5 Pro、5.0 Lite、4.5、4.0 | [各型号入口](seedream-icodeeasy/SKILL.md) |
+| FLUX 2 Pro、Max、Flex、FLUX 3 Image、Image Klein | [各型号入口](flux-icodeeasy/SKILL.md) |
 
-每个 skill 包含独立脚本和说明，可单独安装。Image 2.5、2.6 默认使用 Flare，指定 Sunburst 时会切换对应模型。生成后会等待完成、下载并展示图片。静态图片编辑时附上参考图即可。
+例如，使用 `$image26-sunburst-icodeeasy 生成一张咖啡杯产品图` 或 `$image26-gif-flare-icodeeasy 生成一盏轻轻摇晃的灯笼 GIF`。生成后会等待完成、下载并展示图片。静态图片编辑时附上参考图即可。
+
+原有的 [Image 2.5](image25-icodeeasy/SKILL.md)、[Image 2.6](image26-icodeeasy/SKILL.md) 和 [Image 2.6 GIF](image26-gif-icodeeasy/SKILL.md) 入口继续可用，未指定变体时默认使用 Flare。
 
 Image 2.6 静态图片按成功结果收费。Flare 和 Sunburst 的 1K PNG 每张 ¥0.0833，2K 每张 ¥0.294，4K 每张 ¥0.392。2K 和 4K 的参考图使用 PNG、JPEG 或 WebP。
 
 GIF 可以纯文生，也可以附参考图，帧数、帧间隔和尺寸由模型决定。纯文生 GIF 标准价为每个成功结果 ¥0.0833，参考图生成 GIF 按实际用量结算。
 
-一次安装或更新四个图片与 GIF skill，下载和解包成功后才覆盖已有文件。
+以下命令会安装或更新所有图片与 GIF skill 及其共用脚本。下载和解包成功后才覆盖已有文件。
 
 ```bash
 (
   update_dir=$(mktemp -d) || exit 1
   trap 'rm -rf "$update_dir"' EXIT
   curl -fL https://github.com/iccccceeeeee/skills/archive/refs/heads/main.tar.gz -o "$update_dir/skills.tar.gz" &&
-  tar -xzf "$update_dir/skills.tar.gz" -C "$update_dir" skills-main/image2-icodeeasy skills-main/image25-icodeeasy skills-main/image26-icodeeasy skills-main/image26-gif-icodeeasy &&
-  for skill_name in image2-icodeeasy image25-icodeeasy image26-icodeeasy image26-gif-icodeeasy; do
+  tar -xzf "$update_dir/skills.tar.gz" -C "$update_dir" &&
+  for skill_dir in "$update_dir"/skills-main/icodeeasy-image-generations \
+                   "$update_dir"/skills-main/image*-icodeeasy \
+                   "$update_dir"/skills-main/seedream*-icodeeasy \
+                   "$update_dir"/skills-main/flux*-icodeeasy; do
+    skill_name=${skill_dir##*/}
     mkdir -p "$HOME/.codex/skills/$skill_name" &&
-    cp -R "$update_dir/skills-main/$skill_name/." "$HOME/.codex/skills/$skill_name/" || exit 1
+    cp -R "$skill_dir/." "$HOME/.codex/skills/$skill_name/" || exit 1
   done
 )
 ```
@@ -48,7 +56,7 @@ export OPENAI_API_KEY="<your-api-key>"
 
 认证也兼容 `ANTHROPIC_AUTH_TOKEN`。图片与下载输出放在项目的 `out/images/`。图片结果链接长期有效，按敏感信息处理。
 
-原名称 [icodeeasy-image-generations](icodeeasy-image-generations/SKILL.md) 提供 Image 2 兼容入口。
+[icodeeasy-image-generations](icodeeasy-image-generations/SKILL.md) 是通用生图入口，未指定模型时使用 Image 2。
 
 ### `icodeeasy-video-generations`
 

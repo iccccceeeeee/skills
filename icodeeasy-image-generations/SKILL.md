@@ -1,98 +1,37 @@
 ---
 name: icodeeasy-image-generations
-description: Use when generating or editing pictures through the iCodeEasy OpenAI-compatible Images API with gpt-image-2, including /v1/images/generations, /v1/images/edits, reference images through image_urls, async image tasks, and credentials from OPENAI_API_KEY or ANTHROPIC_AUTH_TOKEN.
+description: Use when explicitly invoking $icodeeasy-image-generations, using the iCodeEasy Images API, or choosing among GPT Image, Seedream, and FLUX image models on iCodeEasy.
 ---
 
 # iCodeEasy Image Generations
 
-## 核心范围
+使用本 skill 的 `scripts/generate_image.py` 生成或编辑静态图片、查询任务及下载结果。把脚本路径解析为绝对路径，从用户项目目录执行。
 
-通过 iCodeEasy 的 OpenAI 兼容 Images API 调用 `gpt-image-2`：
+| 用户选择 | `--model` | 有参考图时的命令 |
+| --- | --- | --- |
+| Image 2，或未指定模型 | `gpt-image-2` | `edit` |
+| Image 2.5 Flare / Sunburst | `gpt-image-2.5-flare` / `gpt-image-2.5-sunburst` | `edit` |
+| Image 2.6 Flare / Sunburst | `gpt-image-2.6-flare` / `gpt-image-2.6-sunburst` | `edit` |
+| Seedream | 默认 `seedream-5-5`；见 [Seedream 型号](references/api.md#seedream) | `generate` |
+| FLUX | 默认 `flux-3-image`，FLUX 2 默认 `flux-2-pro`；见 [FLUX 型号](references/api.md#flux) | `generate` |
 
-- 文生图默认用 `https://jp.icodeeasy.cc/v1/images/generations`。
-- 明确编辑已有图片时用 `https://jp.icodeeasy.cc/v1/images/edits`，并把参考图放进 JSON 的 `image_urls` 字段。
-- 不要传 `size`。让接口使用默认尺寸策略，脚本也不暴露 `--size`。
+只说 Flare 或 Sunburst（也接受 `sunbrust` 的写法）时用 Image 2.6。指定 2.5 或 2.6 而未指定变体时用对应版本的 Flare。保留用户明确指定的版本、变体和输出格式。
 
-默认认证从环境变量读取：
+| 输出 | Flare | Sunburst |
+| --- | --- | --- |
+| Image 2.5 静态图 | [$image25-flare-icodeeasy](../image25-flare-icodeeasy/SKILL.md) | [$image25-sunburst-icodeeasy](../image25-sunburst-icodeeasy/SKILL.md) |
+| Image 2.6 静态图 | [$image26-flare-icodeeasy](../image26-flare-icodeeasy/SKILL.md) | [$image26-sunburst-icodeeasy](../image26-sunburst-icodeeasy/SKILL.md) |
+| Image 2.6 GIF | [$image26-gif-flare-icodeeasy](../image26-gif-flare-icodeeasy/SKILL.md) | [$image26-gif-sunburst-icodeeasy](../image26-gif-sunburst-icodeeasy/SKILL.md) |
 
-- 优先 `OPENAI_API_KEY`
-- 没有时回退到 `ANTHROPIC_AUTH_TOKEN`
+各子型号的独立入口见 [Seedream 系列](../seedream-icodeeasy/SKILL.md)和 [FLUX 系列](../flux-icodeeasy/SKILL.md)。
 
-不要打印、保存或回显 API key。图片结果 URL 本身就是凭据，只把完整链接发给请求者，不要贴到公开渠道。
-
-## 推荐入口
-
-优先用脚本，不要手写 curl：
-
-```bash
-python3 scripts/generate_image.py generate --prompt "一只橘猫坐在窗台上看夕阳，水彩画风格"
-```
-
-常用参数：
-
-- `--resolution`: 默认 `1k`，可选 `1k`、`2k` 或 `4k`。Image 2.6 按成功结果收费，1K 每张 ¥0.0833，2K 每张 ¥0.294，4K 每张 ¥0.392。
-- `--quality`: 默认 `medium`，可选 `low`、`medium`、`high`、`auto`。按实际任务费用结算，画质字段不额外选择价格档。
-- `--n`: 每次请求使用 `1`，多张图片分别提交任务。
-- `--image-url`: 参考图 URL 或 data URL，可重复，URL 必须是 `https://`。
-- `--image-file`: 本地参考图，可重复，脚本会转成 `data:image/*;base64,...` 放进 `image_urls`。
-- Image 2.6 的 2K 和 4K 参考图使用 PNG、JPEG 或 WebP。
-- `--download-dir`: 下载返回的图片到本地目录。
-- `--json`: 输出机器可读结果。
-
-## 工作流
-
-1. 抽取用户的 prompt、张数、分辨率、质量档和参考图。
-2. 如果用户没有明确授权调用这个付费外部 API，先确认一次。
-3. 文生图用 `generate`。编辑图片用 `edit`，并且必须提供至少一张 `--image-file` 或 `--image-url`。
-4. 请求可能等待 30 到 60 秒以上；不想阻塞时用 `--async`，再用 `poll` 子命令取结果。
-5. 返回结果时给图片 URL 或本地下载路径，并说明使用的模型、质量档和张数。
-
-## 示例
-
-同步生成并下载：
+文生图用 `generate`。用 `--image-file` 或 `--image-url` 添加参考图，可重复。每个任务生成一张；需要多张时逐张提交。尺寸、比例、参考图上限按[对应模型的 API 参考](references/api.md)选择。
 
 ```bash
-python3 scripts/generate_image.py generate \
-  --prompt "a corgi astronaut on the moon, cinematic" \
-  --resolution 2k \
-  --quality medium \
-  --download-dir ./out/images
+python3 scripts/generate_image.py generate --model gpt-image-2.6-sunburst \
+  --prompt "夕阳下的木质栈桥，水彩" --async --wait --download-dir ./out/images --json
 ```
 
-编辑已有图片：
+用户明确要求通过本 skill 生成或编辑时，可调用付费 API。只询问模型、参数或价格时不发生成请求。认证依次读取 `OPENAI_API_KEY`、`ANTHROPIC_AUTH_TOKEN`，不要输出密钥。`--dry-run --json` 可在无密钥、无网络的情况下核对请求。
 
-```bash
-python3 scripts/generate_image.py edit \
-  --prompt "把这个人物改成 70 岁，保留原构图和光线" \
-  --image-file /path/to/photo.png
-```
-
-异步提交并轮询：
-
-```bash
-python3 scripts/generate_image.py generate --async --prompt "赛博朋克城市雨夜，电影感" --json
-python3 scripts/generate_image.py poll d142c93a-de26-40c9-be62-0de840d10960 --wait --json
-```
-
-调用前检查 payload，不联网：
-
-```bash
-python3 scripts/generate_image.py generate \
-  --prompt "minimal product photo of a ceramic cup" \
-  --dry-run \
-  --json
-```
-
-## 错误处理
-
-- `400`: 检查参考图数量、URL 是否为 `https://`、base64 是否是合法 data URL。
-- `401`: 检查 `OPENAI_API_KEY` 或 `ANTHROPIC_AUTH_TOKEN`。
-- `402`: 余额或额度不足。
-- `429`: 降低并发或稍后重试。
-- `5xx`: 服务暂时不可用。已有任务 ID 时继续查询同一个任务，保留成功结果。
-
-失败请求按接口文档不计费。不要把失败归因写死，除非响应体明确说明原因。
-
-## 参考
-
-需要查参数边界时读 `references/api.md`。脚本参数以 `python3 scripts/generate_image.py --help` 和子命令 `--help` 为准。
+默认保存到项目的 `out/images/`，展示本地绝对路径，并说明实际使用的模型。结果链接按持有即可访问的敏感信息处理。提交成功后若轮询超时或下载失败，用 `poll TASK_ID --wait --download-dir ./out/images --json` 恢复原任务。
