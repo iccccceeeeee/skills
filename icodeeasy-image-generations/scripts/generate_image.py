@@ -8,6 +8,7 @@ import base64
 import json
 import mimetypes
 import os
+import re
 import shlex
 import sys
 import time
@@ -20,7 +21,24 @@ from typing import Any
 
 BASE_URL = "https://jp.icodeeasy.cc"
 MODEL = "gpt-image-2"
-MODELS = (MODEL, "gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2.6-flare", "gpt-image-2.6-sunburst")
+GPT_MODELS = (MODEL, "gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2.6-flare", "gpt-image-2.6-sunburst")
+SEEDREAM_LITE = "doubao-seedream-5-0-lite"
+# The first tier is the relay's default for each model.
+SEEDREAM_TIERS = {
+    "seedream-5-5": ("2k", "1k", "1.5k"),
+    "seedream-5-0-flash": ("1k", "1.5k", "2k"),
+    "seedream-5-0-pro": ("1k", "1.5k", "2k"),
+    "seedream-4-5": ("2k", "4k"),
+    "seedream-4-0": ("2k", "1k", "4k"),
+    SEEDREAM_LITE: ("2k", "3k"),
+}
+SEEDREAM_LITE_RATIOS = ("1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3", "21:9")
+FLUX_2_MODELS = ("flux-2-pro", "flux-2-max", "flux-2-flex")
+FLUX_3_MODELS = ("flux-3-image", "flux-3-image-klein")
+FLUX_3_RATIOS = ("1:1", "9:16", "16:9", "2:3", "3:2", "4:5", "5:4")
+FLUX_3_TIERS = ("1k", "768sq", "1.5k", "2k", "4k")
+GPT_TIERS = ("1k", "2k", "4k")
+MODELS = (*GPT_MODELS, *SEEDREAM_TIERS, *FLUX_2_MODELS, *FLUX_3_MODELS)
 ASPECT_RATIOS = ("auto", "1:1", "3:2", "2:3", "16:9", "9:16", "4:3", "3:4", "4:5", "5:4")
 GENERATIONS_PATH = "/v1/images/generations"
 EDITS_PATH = "/v1/images/edits"
@@ -196,15 +214,82 @@ def emit(args: argparse.Namespace, result: dict[str, Any]) -> None:
 
 def collect_image_urls(args: argparse.Namespace) -> list[str]:
     image_urls = list(args.image_url or [])
-    image_urls.extend(image_file_to_data_url(path) for path in args.image_file or [])
-    if len(image_urls) > 8:
-        raise UserError("image_urls supports at most 8 reference images.")
+    image_files = args.image_file or []
+    limit = 10 if args.model == "seedream-5-5" else 8
+    if len(image_urls) + len(image_files) > limit:
+        raise UserError(f"{args.model} supports at most {limit} reference images.")
+    image_urls.extend(image_file_to_data_url(path) for path in image_files)
     return image_urls
 
 
+def image_tier(args: argparse.Namespace, tiers: tuple[str, ...]) -> str:
+    tier = args.resolution or tiers[0]
+    if tier not in tiers:
+        raise UserError(f"Unsupported resolution for {args.model}. Use {', '.join(tiers)}.")
+    return tier if tier == "768sq" else tier.upper()
+
+
+def build_generation_only_payload(args: argparse.Namespace, image_urls: list[str]) -> dict[str, Any]:
+    if args.quality is not None:
+        raise UserError(f"--quality is not supported for {args.model}.")
+
+    payload: dict[str, Any] = {"model": args.model, "prompt": args.prompt, "n": 1}
+    if image_urls:
+        payload["image_input"] = image_urls
+    if args.seed is not None:
+        if args.model not in FLUX_2_MODELS and args.model != "flux-3-image-klein":
+            raise UserError(f"--seed is not supported for {args.model}.")
+        if not 0 <= args.seed <= 4_294_967_295:
+            raise UserError("--seed must be from 0 to 4294967295.")
+        payload["seed"] = args.seed
+
+    if args.model in FLUX_2_MODELS:
+        if args.resolution is not None or args.aspect_ratio is not None:
+            raise UserError(f"Use --size WIDTHxHEIGHT for {args.model}.")
+        size = args.size or "1024x1024"
+        match = re.fullmatch(r"([0-9]{1,5})x([0-9]{1,5})", size, re.IGNORECASE)
+        if match is None:
+            raise UserError("--size must be WIDTHxHEIGHT, with at least 64 pixels per side and at most 4 MP.")
+        width, height = map(int, match.groups())
+        if min(width, height) < 64 or width * height > 4 * 1024 * 1024:
+            raise UserError("--size must have at least 64 pixels per side and at most 4 MP.")
+        payload["size"] = f"{width}x{height}"
+        return payload
+
+    if args.size is not None:
+        raise UserError(f"Use --resolution and --aspect-ratio instead of --size for {args.model}.")
+    if args.model in SEEDREAM_TIERS:
+        tiers = SEEDREAM_TIERS[args.model]
+        ratios = SEEDREAM_LITE_RATIOS
+        if args.model != SEEDREAM_LITE:
+            ratios += ("2:1", "1:2")
+        if args.model.startswith("seedream-4-"):
+            ratios += ("9:21",)
+        if args.model == "seedream-4-0" and len(args.prompt) > 1000:
+            raise UserError("Seedream 4.0 prompt must not exceed 1000 characters.")
+    else:
+        tiers, ratios = FLUX_3_TIERS, FLUX_3_RATIOS
+    ratio = args.aspect_ratio or "1:1"
+    if ratio not in ratios:
+        raise UserError(f"Unsupported aspect ratio for {args.model}. Use {', '.join(ratios)}.")
+    payload["aspect_ratio"] = ratio
+    payload["image_size"] = image_tier(args, tiers)
+    return payload
+
+
 def build_payload(args: argparse.Namespace, *, require_reference: bool) -> dict[str, Any]:
+    generation_only = args.model not in GPT_MODELS
+    if generation_only and require_reference:
+        raise UserError(f"{args.model} uses generate with --image-url or --image-file for image-to-image requests.")
+    if args.model != "gpt-image-2" and args.n != 1:
+        raise UserError(f"{args.model} supports one image per request. Use --n 1.")
     image_urls = collect_image_urls(args)
-    if args.model.startswith("gpt-image-2.6-") and args.resolution in ("2k", "4k") and any(
+    if generation_only:
+        return build_generation_only_payload(args, image_urls)
+    if args.size is not None or args.seed is not None:
+        raise UserError(f"--size and --seed are not supported for {args.model}.")
+    tier = image_tier(args, GPT_TIERS)
+    if args.model.startswith("gpt-image-2.6-") and tier in ("2K", "4K") and any(
         url.startswith("data:") and url.partition(";")[0].lower() not in (
             "data:image/png", "data:image/jpeg", "data:image/jpg", "data:image/webp"
         )
@@ -213,8 +298,6 @@ def build_payload(args: argparse.Namespace, *, require_reference: bool) -> dict[
         raise UserError("Use PNG, JPEG, or WebP reference images with GPT Image 2.6 at 2K or 4K.")
     if require_reference and not image_urls:
         raise UserError("Edit requests require at least one --image-url or --image-file.")
-    if args.model != "gpt-image-2" and args.n != 1:
-        raise UserError("GPT Image 2.5 and 2.6 support one image per request; use --n 1.")
     if args.aspect_ratio:
         ratios = ASPECT_RATIOS + (("21:9",) if args.model.startswith("gpt-image-2.5-") else ())
         if args.aspect_ratio not in ratios:
@@ -223,7 +306,7 @@ def build_payload(args: argparse.Namespace, *, require_reference: bool) -> dict[
         "model": args.model,
         "prompt": args.prompt,
         "n": args.n,
-        "image_size": args.resolution.upper(),
+        "image_size": tier,
         "quality": args.quality or ("medium" if args.model == "gpt-image-2" else "auto"),
     }
     if args.aspect_ratio:
@@ -335,11 +418,12 @@ def command_submit(args: argparse.Namespace) -> int:
 
     if args.dry_run:
         safe_payload = dict(payload)
-        if "image_urls" in safe_payload:
-            safe_payload["image_urls"] = [
-                value if value.startswith("https://") else "<data-url>"
-                for value in safe_payload["image_urls"]
-            ]
+        for field in ("image_urls", "image_input"):
+            if field in safe_payload:
+                safe_payload[field] = [
+                    value if value.startswith("https://") else "<data-url>"
+                    for value in safe_payload[field]
+                ]
         emit(args, {
             "ok": True,
             "summary": "Dry run only. No network request was sent.",
@@ -402,9 +486,14 @@ def add_submit_args(parser: argparse.ArgumentParser, *, prompt_help: str) -> Non
     add_common_network_args(parser)
     parser.add_argument("--prompt", required=True, help=prompt_help)
     parser.add_argument("--model", choices=MODELS, default=MODEL, help="image model")
-    parser.add_argument("--n", type=positive_int, default=1, help="number of images; 2.5 and 2.6 require 1")
-    parser.add_argument("--resolution", choices=["1k", "2k", "4k"], default="1k", help="image resolution; default 1k")
-    parser.add_argument("--quality", choices=["low", "medium", "high", "auto"], help="default: medium for GPT Image 2, auto for 2.5/2.6")
+    parser.add_argument("--n", type=positive_int, default=1, help="number of images; only GPT Image 2 accepts more than one")
+    parser.add_argument(
+        "--resolution", type=str.lower, choices=("768sq", "1k", "1.5k", "2k", "3k", "4k"),
+        help="resolution tier for GPT Image, Seedream, or FLUX 3; defaults depend on model",
+    )
+    parser.add_argument("--size", help="FLUX 2 pixel dimensions, such as 1920x1080; default 1024x1024")
+    parser.add_argument("--seed", type=int, help="optional seed for FLUX 2 and FLUX 3 Image Klein")
+    parser.add_argument("--quality", choices=["low", "medium", "high", "auto"], help="GPT Image only; defaults to medium for 2, auto for 2.5/2.6")
     parser.add_argument("--aspect-ratio", help="optional image ratio, such as 1:1 or 16:9")
     parser.add_argument(
         "--image-url",
@@ -415,7 +504,7 @@ def add_submit_args(parser: argparse.ArgumentParser, *, prompt_help: str) -> Non
     parser.add_argument(
         "--image-file",
         action="append",
-        help="local reference image file encoded into image_urls; repeatable",
+        help="local reference image file encoded as an image data URL; repeatable",
     )
     parser.add_argument("--async", dest="async_mode", action="store_true", help="submit async task")
     parser.add_argument("--wait", action="store_true", help="wait for async task completion")
